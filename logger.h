@@ -2,11 +2,10 @@
 #define __LOGGER_H__
 #include <string>
 #define LM_NOLOG	0
-#define LM_NOTICE	1
-#define LM_DEADLY	2
-#define LM_ERROR	3
-#define LM_INFO		4
-#define LM_DEBUG	5
+#define LM_DEADLY	1
+#define LM_ERROR	2
+#define LM_INFO		3
+#define LM_DEBUG	4
 
 class Logger
 {
