@@ -1,156 +1,152 @@
 #include "logger.h"
 #include <cstdio>
-#include <cstring>
 #include <ctime>
+#include <chrono>
+#include <iomanip>
+#include <mutex>
 #include <string>
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#else
 #include <sys/stat.h>
-#include <time.h>
-#include <wchar.h>
-#include <memory>
-#include <vector>
 #include <unistd.h>
+#endif
 
-int Logger::m_nPrintLevel = LM_DEBUG;
+#define ToCString c_str
+#define IsEmpty empty
+
 int Logger::m_nLogLevel = LM_NOLOG;
-std::string Logger::m_strLogPath;
+int Logger::m_nPrintLevel = LM_DEBUG;
 FILE* Logger::m_pFile = nullptr;
-std::string Logger::m_strLogDate;
+String Logger::m_strLogDate;
+std::mutex Logger::m_fileMutex;
+String Logger::m_strLogPath;
 
-inline std::string currentDateTime(const std::string& format) {
-    time_t _time = time(nullptr);
-    struct tm* _tm = localtime(&_time);
-    char buf[1024];
-    strftime(buf, 1024, format.c_str(), _tm);
-    return std::string(buf, strlen(buf));
-}
-
-template<typename ... Args>
-inline std::string formatString(const std::string& format, Args ... args)
+Logger::Logger(int level)
+    : m_nLevel(level)
 {
-    auto size = std::snprintf(nullptr, 0, format.c_str(), args ...) + 1;
-    std::unique_ptr<char[]> buf(new char[size]);
-    std::snprintf(buf.get(), size, format.c_str(), args ...);
-    return std::string(buf.get(), buf.get() + size - 1);
-}
-
-void mkdirs(const char *muldir) 
-{
-    int i,len;
-    char str[512];    
-    strncpy(str, muldir, 512);
-    len=strlen(str);
-    for( i=0; i<len; i++ )
-    {
-        if( str[i]=='/' )
-        {
-            str[i] = '\0';
-            if( access(str,0)!=0 )
-            {
-                mkdir( str, 0775 );
-            }
-            str[i]='/';
-        }
-    }
-    if( len>0 && access(str,0)!=0 )
-    {
-        mkdir( str, 0775 );
-    }
-    return;
-}
-
-void Logger::init(int nPrintLevel, int nLogLevel, std::string strLogPath)
-{
-	m_nPrintLevel = nPrintLevel;
-	m_nLogLevel = nLogLevel;
-	m_strLogPath = strLogPath;
-}
-
-void Logger::clean()
-{
-	if (m_pFile) {
-		fclose(m_pFile);
-		m_pFile = nullptr;
-	}
 }
 
 Logger::~Logger()
 {
-	if (m_strLogContent.empty())return;
-
-	if (m_nLevel > LM_NOLOG && m_nLevel <= m_nLogLevel) {
-		if (openLogFile()) {
-			fwprintf(m_pFile, L"[%s]%s%s\n", currentDateTime("%Y-%m-%d %H:%M:%S").c_str(), getLevelFlag(m_nLevel, false), m_strLogContent.c_str());
-			fflush(m_pFile);
-		}
-	}
-
-	if (m_nLevel > LM_NOLOG && m_nLevel <= m_nPrintLevel) {
-		fwprintf(stderr, L"[%s]%s%s\n", currentDateTime("%Y-%m-%d %H:%M:%S").c_str(), getLevelFlag(m_nLevel, true), m_strLogContent.c_str());
-		fflush(m_pFile);
-	}
-}
-
-Logger& Logger::operator<<(const std::string& str)
-{
-	m_strLogContent.append(str);
-	return *this;
-}
-
-Logger& Logger::operator<<(const int _number)
-{
-    m_strLogContent.append(std::to_string(_number));
-    return *this;
-}
-
-Logger& Logger::operator<<(const unsigned int _number)
-{
-    m_strLogContent.append(std::to_string(_number));
-    return *this;
-}
-
-
-bool Logger::openLogFile()
-{
-	auto _t = currentDateTime("%Y-%m-%d");
-	
-
-	if (m_pFile) {
-		if (m_strLogDate == _t) {
-			return true;
-		}
-		fclose(m_pFile);
-	}
-
-    m_strLogDate = _t;
-	
-	if (!m_strLogPath.empty()) {
-        if(access(m_strLogPath.c_str(), 0)!=0){
-            mkdirs(m_strLogPath.c_str());
-        }
-		std::string strFile = formatString("%s/%s.log", m_strLogPath.c_str(), m_strLogDate.c_str());
-		m_pFile = std::fopen(strFile.c_str(), "a+");
-		if (m_pFile)return true;
-	}
-	return false;
-}
-
-const char* Logger::getLevelFlag(int nLevel, bool bColor)
-{
-	if(bColor) {
-        switch (nLevel) {
-        case LM_DEADLY: return "\033[0;35;40m[Deadly]\033[0m";
-        case LM_ERROR:  return "\033[0;31;40m[Error]\033[0m";
-        case LM_INFO:   return "\033[0;32;40m[Info]\033[0m";
-        case LM_DEBUG:  return "\033[0;34;40m[Debug]\033[0m";
-        }
-    } else {
-        switch (nLevel) {
-        case LM_DEADLY: return "[Deadly]";
-        case LM_ERROR:  return "[Error]";
-        case LM_INFO:   return "[Info]";
-        case LM_DEBUG:  return "[Debug]";
+    std::time_t now_c = time(nullptr);
+    char temp[64];
+    strftime(temp, 64, "[%Y-%m-%d %H:%M:%S]", localtime(&now_c));
+    if (m_nLevel <= m_nLogLevel) {
+        if (openFile()) {
+            std::unique_lock<std::mutex> locker(m_fileMutex);
+            fprintf(m_pFile, "%s%s%s\n", temp, getLevelFlag(m_nLevel, false), m_data.ToCString());
+            fflush(m_pFile);
         }
     }
-    
+    if (m_nLevel <= m_nPrintLevel) {
+        fprintf(stderr, "%s%s%s\n", temp, getLevelFlag(m_nLevel, true), m_data.ToCString());
+    }
+}
+
+void Logger::setLogLevel(int nLogLevel, const String& strLogPath)
+{
+    if (strLogPath.IsEmpty()) return;
+    m_strLogPath = strLogPath;
+    if (m_strLogPath.back() != '/') {
+        m_strLogPath.push_back('/');
+    }
+    const char* path = m_strLogPath.ToCString();
+#ifdef _WIN32
+    if (0 != _access(path, 0)) {
+        if (0 != _mkdir(path))
+#else
+    if (0 != access(path, 0)) {
+        if (0 != mkdir(path, 0744))
+#endif
+        {
+            perror("mkdir");
+            return;
+        }
+    }
+    m_nLogLevel = nLogLevel;
+}
+
+void Logger::setPrintLevel(int nPrintLevel)
+{
+    m_nPrintLevel = nPrintLevel;
+}
+
+Logger& Logger::operator<<(const char str[])
+{
+    m_data += (str);
+    return (*this);
+}
+
+Logger& Logger::operator<<(const String& str)
+{
+    m_data += (str);
+    return (*this);
+}
+
+Logger& Logger::operator<<(const int n)
+{
+    m_data += std::to_string(n);
+    return (*this);
+}
+
+Logger& Logger::operator<<(const double n)
+{
+    m_data += std::to_string(n);
+    return (*this);
+}
+
+Logger& Logger::operator<<(const long long int n)
+{
+    m_data += std::to_string(n);
+    return (*this);
+}
+Logger& Logger::operator<<(const unsigned int n)
+{
+    m_data += std::to_string(n);
+    return (*this);
+}
+Logger& Logger::operator<<(const unsigned long long int n)
+{
+    m_data += std::to_string(n);
+    return (*this);
+}
+
+bool Logger::openFile()
+{
+    std::time_t now_c = time(nullptr);
+    char temp[64];
+    strftime(temp, 64, "%Y-%m-%d", localtime(&now_c));
+    if (m_pFile) {
+        if (m_strLogDate == temp) return true;
+    }
+    m_strLogDate = temp;
+    char szNewFile[128];
+    sprintf(szNewFile, "%s%s.log", m_strLogPath.ToCString(), temp);
+    if (m_pFile) fclose(m_pFile);
+    m_pFile = fopen(szNewFile, "a");
+    if (!m_pFile) return false;
+    return true;
+}
+
+const char* Logger::getLevelFlag(int level, bool bColor)
+{
+    if (bColor) {
+        switch (level) {
+        case LM_DEADLY: return "\033[0;35;40m[Deadly]\033[0m";
+        case LM_ERROR: return "\033[0;31;40m[Error]\033[0m";
+        case LM_INFO: return "\033[0;32;40m[Info]\033[0m";
+        case LM_DEBUG: return "\033[0;34;40m[Debug]\033[0m";
+        }
+    } else {
+        switch (level) {
+        case LM_DEADLY: return "[Deadly]";
+        case LM_ERROR: return "[Error]";
+        case LM_INFO: return "[Info]";
+        case LM_DEBUG: return "[Debug]";
+        }
+    }
+
     return "[Unknow]";
 }
