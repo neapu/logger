@@ -34,13 +34,6 @@ public:
     Logger& operator<<(const unsigned int n);
     Logger& operator<<(const unsigned long long int n);
 
-    template <typename T>
-    Logger& operator<<(const T& data)
-    {
-        m_data += (data.ToString());
-        return (*this);
-    }
-
 private:
     static bool openFile();
     static const char* getLevelFlag(int level, bool bColor);
