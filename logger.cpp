@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <string>
 #include <sys/stat.h>
 #include <time.h>
 #include <wchar.h>
@@ -94,6 +95,19 @@ Logger& Logger::operator<<(const std::string& str)
 	m_strLogContent.append(str);
 	return *this;
 }
+
+Logger& Logger::operator<<(const int _number)
+{
+    m_strLogContent.append(std::to_string(_number));
+    return *this;
+}
+
+Logger& Logger::operator<<(const unsigned int _number)
+{
+    m_strLogContent.append(std::to_string(_number));
+    return *this;
+}
+
 
 bool Logger::openLogFile()
 {

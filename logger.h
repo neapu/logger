@@ -7,6 +7,14 @@
 #define LM_INFO		3
 #define LM_DEBUG	4
 
+#define __FILENAME__ (strrchr(__FILE__, '/') ? (strrchr(__FILE__, '/') + 1):__FILE__)
+
+#define LOG(x) Logger(x)<<"["<<__FILENAME__<<":"<< __LINE__<<"]["<<__FUNCTION__<<"]"
+#define LOG_DEBUG  LOG(LM_DEBUG)
+#define LOG_INFO   LOG(LM_INFO)
+#define LOG_ERROR  LOG(LM_ERROR)
+#define LOG_DEADLY LOG(LM_DEADLY)
+
 class Logger
 {
 public:
@@ -19,6 +27,8 @@ public:
     virtual ~Logger();
 
     Logger& operator<<(const std::string& str);
+    Logger& operator<<(const int _number);
+    Logger& operator<<(const unsigned int _number);
 private:
     static bool openLogFile();
     static const char* getLevelFlag(int nLevel, bool bColor);
