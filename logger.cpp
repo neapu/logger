@@ -13,15 +13,15 @@
 #include <unistd.h>
 #endif
 
-#define ToCString c_str
+#define ToCString str().c_str
 #define IsEmpty empty
 
 int Logger::m_nLogLevel = LM_NOLOG;
 int Logger::m_nPrintLevel = LM_DEBUG;
 FILE* Logger::m_pFile = nullptr;
-String Logger::m_strLogDate;
+Logger::String Logger::m_strLogDate;
 std::mutex Logger::m_fileMutex;
-String Logger::m_strLogPath;
+Logger::String Logger::m_strLogPath;
 
 Logger::Logger(int level)
     : m_nLevel(level)
@@ -41,7 +41,7 @@ Logger::~Logger()
         }
     }
     if (m_nLevel <= m_nPrintLevel) {
-        fprintf(stderr, "%s%s%s\n", temp, getLevelFlag(m_nLevel, true), m_data.ToCString());
+        fprintf(stderr, "%s%s%s\n", temp, getLevelFlag(m_nLevel, false), m_data.ToCString());
     }
 }
 
@@ -52,7 +52,7 @@ void Logger::setLogLevel(int nLogLevel, const String& strLogPath)
     if (m_strLogPath.back() != '/') {
         m_strLogPath.push_back('/');
     }
-    const char* path = m_strLogPath.ToCString();
+    const char* path = m_strLogPath.c_str();
 #ifdef _WIN32
     if (0 != _access(path, 0)) {
         if (0 != _mkdir(path))
@@ -73,45 +73,45 @@ void Logger::setPrintLevel(int nPrintLevel)
     m_nPrintLevel = nPrintLevel;
 }
 
-Logger& Logger::operator<<(const char str[])
-{
-    m_data += (str);
-    return (*this);
-}
-
-Logger& Logger::operator<<(const String& str)
-{
-    m_data += (str);
-    return (*this);
-}
-
-Logger& Logger::operator<<(const int n)
-{
-    m_data += std::to_string(n);
-    return (*this);
-}
-
-Logger& Logger::operator<<(const double n)
-{
-    m_data += std::to_string(n);
-    return (*this);
-}
-
-Logger& Logger::operator<<(const long long int n)
-{
-    m_data += std::to_string(n);
-    return (*this);
-}
-Logger& Logger::operator<<(const unsigned int n)
-{
-    m_data += std::to_string(n);
-    return (*this);
-}
-Logger& Logger::operator<<(const unsigned long long int n)
-{
-    m_data += std::to_string(n);
-    return (*this);
-}
+//Logger& Logger::operator<<(const char str[])
+//{
+//    m_data += (str);
+//    return (*this);
+//}
+//
+//Logger& Logger::operator<<(const String& str)
+//{
+//    m_data += (str);
+//    return (*this);
+//}
+//
+//Logger& Logger::operator<<(const int n)
+//{
+//    m_data += std::to_string(n);
+//    return (*this);
+//}
+//
+//Logger& Logger::operator<<(const double n)
+//{
+//    m_data += std::to_string(n);
+//    return (*this);
+//}
+//
+//Logger& Logger::operator<<(const long long int n)
+//{
+//    m_data += std::to_string(n);
+//    return (*this);
+//}
+//Logger& Logger::operator<<(const unsigned int n)
+//{
+//    m_data += std::to_string(n);
+//    return (*this);
+//}
+//Logger& Logger::operator<<(const unsigned long long int n)
+//{
+//    m_data += std::to_string(n);
+//    return (*this);
+//}
 
 bool Logger::openFile()
 {
@@ -123,7 +123,7 @@ bool Logger::openFile()
     }
     m_strLogDate = temp;
     char szNewFile[128];
-    sprintf(szNewFile, "%s%s.log", m_strLogPath.ToCString(), temp);
+    sprintf(szNewFile, "%s%s.log", m_strLogPath.c_str(), temp);
     if (m_pFile) fclose(m_pFile);
     m_pFile = fopen(szNewFile, "a");
     if (!m_pFile) return false;

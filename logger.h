@@ -1,5 +1,6 @@
 #ifndef __LOGGER_H__
 #define __LOGGER_H__
+#include <sstream>
 #include <string>
 #include <mutex>
 #define LM_NOLOG 0
@@ -16,9 +17,8 @@
 #define LOG_ERROR LOG(LM_ERROR)
 #define LOG_DEADLY LOG(LM_DEADLY)
 
-using String = std::string;
-
 class Logger {
+    using String = std::string;
 public:
     Logger(int level);
     ~Logger();
@@ -26,13 +26,21 @@ public:
     static void setLogLevel(int nLogLevel, const String& strLogPath);
     static void setPrintLevel(int nPrintLevel);
 
-    Logger& operator<<(const char str[]);
-    Logger& operator<<(const String& str);
-    Logger& operator<<(const double n);
-    Logger& operator<<(const int n);
-    Logger& operator<<(const long long int n);
-    Logger& operator<<(const unsigned int n);
-    Logger& operator<<(const unsigned long long int n);
+    template<class T>
+    Logger& operator<<(T&& t)
+    {
+        m_data << std::forward<T>(t);
+        return *this;
+    }
+
+    //Logger& operator<<(const char str[]);
+    //Logger& operator<<(const String& str);
+    //Logger& operator<<(const double n);
+    //Logger& operator<<(const int n);
+    //Logger& operator<<(const long long int n);
+    //Logger& operator<<(const unsigned int n);
+    //Logger& operator<<(const unsigned long long int n);
+
 
 private:
     static bool openFile();
@@ -40,7 +48,7 @@ private:
 
 private:
     int m_nLevel;
-    String m_data;
+    std::stringstream m_data;
 
     static int m_nLogLevel;
     static int m_nPrintLevel;
