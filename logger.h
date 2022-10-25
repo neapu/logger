@@ -45,6 +45,7 @@ public:
 private:
     static bool openFile();
     static const char* getLevelFlag(int level, bool bColor);
+    static String GetTime();
 
 private:
     int m_nLevel;

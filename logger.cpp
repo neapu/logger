@@ -31,17 +31,15 @@ Logger::Logger(int level)
 Logger::~Logger()
 {
     std::time_t now_c = time(nullptr);
-    char temp[64];
-    strftime(temp, 64, "[%Y-%m-%d %H:%M:%S]", localtime(&now_c));
     if (m_nLevel <= m_nLogLevel) {
         if (openFile()) {
             std::unique_lock<std::mutex> locker(m_fileMutex);
-            fprintf(m_pFile, "%s%s%s\n", temp, getLevelFlag(m_nLevel, false), m_data.ToCString());
+            fprintf(m_pFile, "[%s]%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
             fflush(m_pFile);
         }
     }
     if (m_nLevel <= m_nPrintLevel) {
-        fprintf(stderr, "%s%s%s\n", temp, getLevelFlag(m_nLevel, false), m_data.ToCString());
+        fprintf(stderr, "[%s]%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
     }
 }
 
@@ -73,45 +71,45 @@ void Logger::setPrintLevel(int nPrintLevel)
     m_nPrintLevel = nPrintLevel;
 }
 
-//Logger& Logger::operator<<(const char str[])
+// Logger& Logger::operator<<(const char str[])
 //{
-//    m_data += (str);
-//    return (*this);
-//}
+//     m_data += (str);
+//     return (*this);
+// }
 //
-//Logger& Logger::operator<<(const String& str)
+// Logger& Logger::operator<<(const String& str)
 //{
-//    m_data += (str);
-//    return (*this);
-//}
+//     m_data += (str);
+//     return (*this);
+// }
 //
-//Logger& Logger::operator<<(const int n)
+// Logger& Logger::operator<<(const int n)
 //{
-//    m_data += std::to_string(n);
-//    return (*this);
-//}
+//     m_data += std::to_string(n);
+//     return (*this);
+// }
 //
-//Logger& Logger::operator<<(const double n)
+// Logger& Logger::operator<<(const double n)
 //{
-//    m_data += std::to_string(n);
-//    return (*this);
-//}
+//     m_data += std::to_string(n);
+//     return (*this);
+// }
 //
-//Logger& Logger::operator<<(const long long int n)
+// Logger& Logger::operator<<(const long long int n)
 //{
-//    m_data += std::to_string(n);
-//    return (*this);
-//}
-//Logger& Logger::operator<<(const unsigned int n)
+//     m_data += std::to_string(n);
+//     return (*this);
+// }
+// Logger& Logger::operator<<(const unsigned int n)
 //{
-//    m_data += std::to_string(n);
-//    return (*this);
-//}
-//Logger& Logger::operator<<(const unsigned long long int n)
+//     m_data += std::to_string(n);
+//     return (*this);
+// }
+// Logger& Logger::operator<<(const unsigned long long int n)
 //{
-//    m_data += std::to_string(n);
-//    return (*this);
-//}
+//     m_data += std::to_string(n);
+//     return (*this);
+// }
 
 bool Logger::openFile()
 {
@@ -149,4 +147,18 @@ const char* Logger::getLevelFlag(int level, bool bColor)
     }
 
     return "[Unknow]";
+}
+
+Logger::String Logger::GetTime()
+{
+    using namespace std::chrono;
+    std::time_t tt = system_clock::to_time_t(system_clock::now());
+    auto microsecond = duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() % 1000000;
+
+    struct std::tm valtm;
+    localtime_s(&valtm, &tt);
+
+    std::stringstream ss;
+    ss << std::put_time(&valtm, "%F %X") << " " << std::setw(3) << std::setfill('0') << microsecond / 1000;
+    return ss.str();
 }
