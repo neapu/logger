@@ -13,6 +13,8 @@
 #include <unistd.h>
 #endif
 
+using namespace neapu;
+
 #define ToCString str().c_str
 #define IsEmpty empty
 
@@ -71,46 +73,6 @@ void Logger::setPrintLevel(int nPrintLevel)
     m_nPrintLevel = nPrintLevel;
 }
 
-// Logger& Logger::operator<<(const char str[])
-//{
-//     m_data += (str);
-//     return (*this);
-// }
-//
-// Logger& Logger::operator<<(const String& str)
-//{
-//     m_data += (str);
-//     return (*this);
-// }
-//
-// Logger& Logger::operator<<(const int n)
-//{
-//     m_data += std::to_string(n);
-//     return (*this);
-// }
-//
-// Logger& Logger::operator<<(const double n)
-//{
-//     m_data += std::to_string(n);
-//     return (*this);
-// }
-//
-// Logger& Logger::operator<<(const long long int n)
-//{
-//     m_data += std::to_string(n);
-//     return (*this);
-// }
-// Logger& Logger::operator<<(const unsigned int n)
-//{
-//     m_data += std::to_string(n);
-//     return (*this);
-// }
-// Logger& Logger::operator<<(const unsigned long long int n)
-//{
-//     m_data += std::to_string(n);
-//     return (*this);
-// }
-
 bool Logger::openFile()
 {
     std::time_t now_c = time(nullptr);
@@ -155,10 +117,15 @@ Logger::String Logger::GetTime()
     std::time_t tt = system_clock::to_time_t(system_clock::now());
     auto microsecond = duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() % 1000000;
 
+#ifdef _WIN32
     struct std::tm valtm;
     localtime_s(&valtm, &tt);
+    auto pValtm = &valtm;
+#else
+    auto pValtm = localtime(&tt);
+#endif
 
     std::stringstream ss;
-    ss << std::put_time(&valtm, "%F %X") << " " << std::setw(3) << std::setfill('0') << microsecond / 1000;
+    ss << std::put_time(pValtm, "%F %X") << " " << std::setw(3) << std::setfill('0') << microsecond / 1000;
     return ss.str();
 }

@@ -17,34 +17,27 @@
 #define LOG_ERROR LOG(LM_ERROR)
 #define LOG_DEADLY LOG(LM_DEADLY)
 
+namespace neapu {
 class Logger {
     using String = std::string;
+
 public:
     Logger(int level);
     ~Logger();
 
-    static void setLogLevel(int nLogLevel, const String& strLogPath);
+    static void setLogLevel(int nLogLevel, const String &strLogPath);
     static void setPrintLevel(int nPrintLevel);
 
-    template<class T>
-    Logger& operator<<(T&& t)
+    template <class T>
+    Logger &operator<<(T &&t)
     {
         m_data << std::forward<T>(t);
         return *this;
     }
 
-    //Logger& operator<<(const char str[]);
-    //Logger& operator<<(const String& str);
-    //Logger& operator<<(const double n);
-    //Logger& operator<<(const int n);
-    //Logger& operator<<(const long long int n);
-    //Logger& operator<<(const unsigned int n);
-    //Logger& operator<<(const unsigned long long int n);
-
-
 private:
     static bool openFile();
-    static const char* getLevelFlag(int level, bool bColor);
+    static const char *getLevelFlag(int level, bool bColor);
     static String GetTime();
 
 private:
@@ -53,9 +46,11 @@ private:
 
     static int m_nLogLevel;
     static int m_nPrintLevel;
-    static FILE* m_pFile;
+    static FILE *m_pFile;
     static String m_strLogDate;
     static std::mutex m_fileMutex;
     static String m_strLogPath;
 };
+} // namespace neapu
+
 #endif // __LOGGER_H__
