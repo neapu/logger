@@ -11,7 +11,7 @@
 
 #define __FILENAME__ (strrchr(__FILE__, '/') ? (strrchr(__FILE__, '/') + 1) : __FILE__)
 
-#define LOG(x) Logger(x) << "[" << __FILENAME__ << ":" << __LINE__ << "][" << __FUNCTION__ << "]"
+#define LOG(x) neapu::Logger(x) << "[" << __FILENAME__ << ":" << __LINE__ << "][" << __FUNCTION__ << "]"
 #define LOG_DEBUG LOG(LM_DEBUG)
 #define LOG_INFO LOG(LM_INFO)
 #define LOG_ERROR LOG(LM_ERROR)
