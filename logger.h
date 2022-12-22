@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <mutex>
+#include <string.h>
 #define LM_NOLOG 0
 #define LM_DEADLY 1
 #define LM_ERROR 2
