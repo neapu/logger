@@ -10,7 +10,11 @@
 #define LM_INFO 3
 #define LM_DEBUG 4
 
+#ifdef _WIN32
+#define __FILENAME__ (strrchr(__FILE__, '\\') ? (strrchr(__FILE__, '\\') + 1) : __FILE__)
+#else
 #define __FILENAME__ (strrchr(__FILE__, '/') ? (strrchr(__FILE__, '/') + 1) : __FILE__)
+#endif
 
 #define LOG(x) neapu::Logger(x) << "[" << __FILENAME__ << ":" << __LINE__ << "][" << __FUNCTION__ << "]"
 #define LOG_DEBUG LOG(LM_DEBUG)
