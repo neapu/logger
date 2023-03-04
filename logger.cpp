@@ -1,4 +1,5 @@
 #include "logger.h"
+#include "logger.h"
 #include <cstdio>
 #include <ctime>
 #include <chrono>
@@ -8,6 +9,7 @@
 #ifdef _WIN32
 #include <io.h>
 #include <direct.h>
+#include <windows.h>
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -36,12 +38,20 @@ Logger::~Logger()
     if (m_nLevel <= m_nLogLevel) {
         if (openFile()) {
             std::unique_lock<std::mutex> locker(m_fileMutex);
-            fprintf(m_pFile, "[%s]%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
+            fprintf(m_pFile, "%s%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
             fflush(m_pFile);
         }
     }
     if (m_nLevel <= m_nPrintLevel) {
-        fprintf(stderr, "[%s]%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
+#ifdef _WIN32
+        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD dwWritten;
+        StringStream rst;
+        rst << GetTime() << getLevelFlag(m_nLevel, false) << m_data.ToCString();
+        WriteConsoleA(hConsole, rst.ToCString(), rst.str().length(), &dwWritten, nullptr);
+#else
+        fprintf(stderr, "%s%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
+#endif
     }
 }
 
@@ -71,6 +81,11 @@ void Logger::setLogLevel(int nLogLevel, const String& strLogPath)
 void Logger::setPrintLevel(int nPrintLevel)
 {
     m_nPrintLevel = nPrintLevel;
+}
+
+void neapu::Logger::setConsoleChcp()
+{
+    system("chcp 65001");
 }
 
 bool Logger::openFile()
@@ -126,6 +141,6 @@ Logger::String Logger::GetTime()
 #endif
 
     std::stringstream ss;
-    ss << std::put_time(pValtm, "%F %X") << " " << std::setw(3) << std::setfill('0') << microsecond / 1000;
+    ss << "[" << std::put_time(pValtm, "%F %X") << " " << std::setw(3) << std::setfill('0') << microsecond / 1000 << "]";
     return ss.str();
 }

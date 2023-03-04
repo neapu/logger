@@ -25,6 +25,7 @@
 namespace neapu {
 class Logger {
     using String = std::string;
+    using StringStream = std::stringstream;
 
 public:
     Logger(int level);
@@ -32,6 +33,9 @@ public:
 
     static void setLogLevel(int nLogLevel, const String &strLogPath);
     static void setPrintLevel(int nPrintLevel);
+#ifdef _WIN32
+    static void setConsoleChcp();
+#endif
 
     template <class T>
     Logger &operator<<(T &&t)
@@ -47,7 +51,7 @@ private:
 
 private:
     int m_nLevel;
-    std::stringstream m_data;
+    StringStream m_data;
 
     static int m_nLogLevel;
     static int m_nPrintLevel;
