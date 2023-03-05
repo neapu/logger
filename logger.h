@@ -59,6 +59,7 @@ private:
     static String m_strLogDate;
     static std::mutex m_fileMutex;
     static String m_strLogPath;
+    static bool m_firstLog;
 };
 } // namespace neapu
 

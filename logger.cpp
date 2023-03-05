@@ -26,6 +26,7 @@ FILE* Logger::m_pFile = nullptr;
 Logger::String Logger::m_strLogDate;
 std::mutex Logger::m_fileMutex;
 Logger::String Logger::m_strLogPath;
+bool Logger::m_firstLog = true;
 
 Logger::Logger(int level)
     : m_nLevel(level)
@@ -38,6 +39,10 @@ Logger::~Logger()
     if (m_nLevel <= m_nLogLevel) {
         if (openFile()) {
             std::unique_lock<std::mutex> locker(m_fileMutex);
+            if (m_firstLog) {
+                m_firstLog = false;
+                fprintf(m_pFile, "------------------------%s------------------------\n", GetTime().c_str());
+            }
             fprintf(m_pFile, "%s%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
             fflush(m_pFile);
         }
