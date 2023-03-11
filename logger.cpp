@@ -52,7 +52,7 @@ Logger::~Logger()
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         DWORD dwWritten;
         StringStream rst;
-        rst << GetTime() << getLevelFlag(m_nLevel, false) << m_data.ToCString();
+        rst << GetTime() << getLevelFlag(m_nLevel, false) << m_data.ToCString() << "\r\n";
         WriteConsoleA(hConsole, rst.ToCString(), rst.str().length(), &dwWritten, nullptr);
 #else
         fprintf(stderr, "%s%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
