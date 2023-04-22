@@ -87,11 +87,12 @@ void Logger::setPrintLevel(int nPrintLevel)
 {
     m_nPrintLevel = nPrintLevel;
 }
-
+#ifdef _WIN32
 void neapu::Logger::setConsoleChcp()
 {
     system("chcp 65001");
 }
+#endif
 
 bool Logger::openFile()
 {
