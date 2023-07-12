@@ -7,8 +7,9 @@
 #define LM_NOLOG 0
 #define LM_DEADLY 1
 #define LM_ERROR 2
-#define LM_INFO 3
-#define LM_DEBUG 4
+#define LM_WARNING 3
+#define LM_INFO 4
+#define LM_DEBUG 5
 
 #ifdef _WIN32
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? (strrchr(__FILE__, '\\') + 1) : __FILE__)
@@ -19,6 +20,7 @@
 #define LOG(x) neapu::Logger(x) << "[" << __FILENAME__ << ":" << __LINE__ << "][" << __FUNCTION__ << "]"
 #define LOG_DEBUG LOG(LM_DEBUG)
 #define LOG_INFO LOG(LM_INFO)
+#define LOG_WARNING LOG(LM_WARNING)
 #define LOG_ERROR LOG(LM_ERROR)
 #define LOG_DEADLY LOG(LM_DEADLY)
 
