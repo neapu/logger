@@ -28,10 +28,7 @@ std::mutex Logger::m_fileMutex;
 Logger::String Logger::m_strLogPath;
 bool Logger::m_firstLog = true;
 
-Logger::Logger(int level)
-    : m_nLevel(level)
-{
-}
+Logger::Logger(int level) : m_nLevel(level) {}
 
 Logger::~Logger()
 {
@@ -117,6 +114,7 @@ const char* Logger::getLevelFlag(int level, bool bColor)
         switch (level) {
         case LM_DEADLY: return "\033[0;35;40m[Deadly]\033[0m";
         case LM_ERROR: return "\033[0;31;40m[Error]\033[0m";
+        case LM_WARNING: return "\033[0;33;40m[Warning]\033[0m";
         case LM_INFO: return "\033[0;32;40m[Info]\033[0m";
         case LM_DEBUG: return "\033[0;34;40m[Debug]\033[0m";
         }
@@ -124,6 +122,7 @@ const char* Logger::getLevelFlag(int level, bool bColor)
         switch (level) {
         case LM_DEADLY: return "[Deadly]";
         case LM_ERROR: return "[Error]";
+        case LM_WARNING: return "[Warning]";
         case LM_INFO: return "[Info]";
         case LM_DEBUG: return "[Debug]";
         }
