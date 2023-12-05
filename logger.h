@@ -10,6 +10,7 @@
 #define LM_WARNING 3
 #define LM_INFO 4
 #define LM_DEBUG 5
+#define LM_VERBOSE 6
 
 #ifdef _WIN32
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? (strrchr(__FILE__, '\\') + 1) : __FILE__)
@@ -23,8 +24,20 @@
 #define LOG_WARNING LOG(LM_WARNING)
 #define LOG_ERROR LOG(LM_ERROR)
 #define LOG_DEADLY LOG(LM_DEADLY)
+#define LOG_VERBOSE LOG(LM_VERBOSE)
+
+#define FUNC_TRACE neapu::FunctionTracer __tracer__(__FUNCTION__)
 
 namespace neapu {
+class FunctionTracer {
+public:
+    FunctionTracer(const char* funcName);
+    ~FunctionTracer();
+
+private:
+    const char* m_funcName;
+};
+
 class Logger {
     using String = std::string;
     using StringStream = std::stringstream;
@@ -33,14 +46,14 @@ public:
     Logger(int level);
     ~Logger();
 
-    static void setLogLevel(int nLogLevel, const String &strLogPath);
+    static void setLogLevel(int nLogLevel, const String& strLogPath);
     static void setPrintLevel(int nPrintLevel);
 #ifdef _WIN32
     static void setConsoleChcp();
 #endif
 
     template <class T>
-    Logger &operator<<(T &&t)
+    Logger& operator<<(T&& t)
     {
         m_data << std::forward<T>(t);
         return *this;
@@ -48,7 +61,7 @@ public:
 
 private:
     static bool openFile();
-    static const char *getLevelFlag(int level, bool bColor);
+    static const char* getLevelFlag(int level, bool bColor);
     static String GetTime();
 
 private:
@@ -57,7 +70,7 @@ private:
 
     static int m_nLogLevel;
     static int m_nPrintLevel;
-    static FILE *m_pFile;
+    static FILE* m_pFile;
     static String m_strLogDate;
     static std::mutex m_fileMutex;
     static String m_strLogPath;

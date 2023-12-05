@@ -20,6 +20,16 @@ using namespace neapu;
 #define ToCString str().c_str
 #define IsEmpty empty
 
+FunctionTracer::FunctionTracer(const char* funcName) : m_funcName(funcName)
+{
+    Logger(LM_DEBUG) << "Enter function: " << m_funcName;
+}
+
+FunctionTracer::~FunctionTracer()
+{
+    Logger(LM_DEBUG) << "Leave function: " << m_funcName;
+}
+
 int Logger::m_nLogLevel = LM_NOLOG;
 int Logger::m_nPrintLevel = LM_DEBUG;
 FILE* Logger::m_pFile = nullptr;
@@ -49,7 +59,7 @@ Logger::~Logger()
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         DWORD dwWritten;
         StringStream rst;
-        rst << GetTime() << getLevelFlag(m_nLevel, false) << m_data.ToCString() << "\r\n";
+        rst << GetTime() << getLevelFlag(m_nLevel, true) << m_data.ToCString() << "\r\n";
         WriteConsoleA(hConsole, rst.ToCString(), rst.str().length(), &dwWritten, nullptr);
 #else
         fprintf(stderr, "%s%s%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), m_data.ToCString());
@@ -117,6 +127,7 @@ const char* Logger::getLevelFlag(int level, bool bColor)
         case LM_WARNING: return "\033[0;33;40m[Warning]\033[0m";
         case LM_INFO: return "\033[0;32;40m[Info]\033[0m";
         case LM_DEBUG: return "\033[0;34;40m[Debug]\033[0m";
+        case LM_VERBOSE: return "\033[0;36;40m[Verbose]\033[0m";
         }
     } else {
         switch (level) {
@@ -125,6 +136,7 @@ const char* Logger::getLevelFlag(int level, bool bColor)
         case LM_WARNING: return "[Warning]";
         case LM_INFO: return "[Info]";
         case LM_DEBUG: return "[Debug]";
+        case LM_VERBOSE: return "[Verbose]";
         }
     }
 
