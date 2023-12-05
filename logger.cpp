@@ -10,8 +10,8 @@
 #include <io.h>
 #include <direct.h>
 #include <windows.h>
-#defined access _access
-#defined mkdir(x,y) _mkdir(x)
+#define access _access
+#define mkdir(x,y) _mkdir(x)
 #else
 #include <sys/stat.h>
 #include <unistd.h>
