@@ -46,7 +46,7 @@ public:
     Logger(int level);
     ~Logger();
 
-    static void setLogLevel(int nLogLevel, const String& strLogPath);
+    static void setLogLevel(int nLogLevel, const String& strLogPath, const String& strLogPrefix = "");
     static void setPrintLevel(int nPrintLevel);
 #ifdef _WIN32
     static void setConsoleChcp();
@@ -75,6 +75,7 @@ private:
     static std::mutex m_fileMutex;
     static String m_strLogPath;
     static bool m_firstLog;
+    static String m_strLogPrefix;
 };
 } // namespace neapu
 
