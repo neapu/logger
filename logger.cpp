@@ -15,6 +15,7 @@
 #else
 #include <sys/stat.h>
 #include <unistd.h>
+#include <pthread.h>
 #endif
 
 using namespace neapu;
@@ -50,7 +51,8 @@ Logger::~Logger()
 #ifdef _WIN32
     threadId = std::to_string(GetCurrentThreadId());
 #else
-    threadId = std::to_string(pthread_self());
+    pthread_t tid = pthread_self();
+    threadId = std::to_string((uint64_t)tid);
 #endif
     if (m_nLevel <= m_nLogLevel) {
         if (openFile()) {
@@ -116,7 +118,7 @@ bool Logger::openFile()
     }
     m_strLogDate = temp;
     char szNewFile[128];
-    sprintf(szNewFile, "%s%s_%s.log", m_strLogPath.c_str(), m_strLogPrefix.c_str(), temp);
+    snprintf(szNewFile, 128, "%s%s_%s.log", m_strLogPath.c_str(), m_strLogPrefix.c_str(), temp);
     if (m_pFile) fclose(m_pFile);
     m_pFile = fopen(szNewFile, "a");
     if (!m_pFile) return false;
