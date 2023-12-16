@@ -26,15 +26,16 @@
 #define LOG_DEADLY LOG(LM_DEADLY)
 #define LOG_VERBOSE LOG(LM_VERBOSE)
 
-#define FUNC_TRACE neapu::FunctionTracer __tracer__(__FUNCTION__)
+#define FUNC_TRACE neapu::FunctionTracer __tracer__(__FILENAME__, __FUNCTION__)
 
 namespace neapu {
 class FunctionTracer {
 public:
-    FunctionTracer(const char* funcName);
+    FunctionTracer(const char* fileName, const char* funcName);
     ~FunctionTracer();
 
 private:
+    const char* m_fileName;
     const char* m_funcName;
 };
 

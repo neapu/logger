@@ -11,7 +11,7 @@
 #include <direct.h>
 #include <windows.h>
 #define access _access
-#define mkdir(x,y) _mkdir(x)
+#define mkdir(x, y) _mkdir(x)
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -23,14 +23,14 @@ using namespace neapu;
 #define ToCString str().c_str
 #define IsEmpty empty
 
-FunctionTracer::FunctionTracer(const char* funcName) : m_funcName(funcName)
+FunctionTracer::FunctionTracer(const char* fileName, const char* funcName) : m_fileName(fileName), m_funcName(funcName)
 {
-    Logger(LM_DEBUG) << "Enter function: " << m_funcName;
+    Logger(LM_DEBUG) << "Enter function: " << fileName << ":" << m_funcName;
 }
 
 FunctionTracer::~FunctionTracer()
 {
-    Logger(LM_DEBUG) << "Leave function: " << m_funcName;
+    Logger(LM_DEBUG) << "Leave function: " << m_fileName << ":" << m_funcName;
 }
 
 int Logger::m_nLogLevel = LM_NOLOG;
@@ -87,8 +87,7 @@ void Logger::setLogLevel(int nLogLevel, const String& strLogPath, const String& 
     }
     const char* path = m_strLogPath.c_str();
     if (0 != access(path, 0)) {
-        if (0 != mkdir(path, 0744))
-        {
+        if (0 != mkdir(path, 0744)) {
             perror("mkdir");
             return;
         }
