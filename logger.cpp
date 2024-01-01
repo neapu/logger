@@ -17,6 +17,9 @@
 #include <unistd.h>
 #include <pthread.h>
 #endif
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 using namespace neapu;
 
@@ -74,6 +77,28 @@ Logger::~Logger()
         WriteConsoleA(hConsole, rst.ToCString(), rst.str().length(), &dwWritten, nullptr);
 #else
         fprintf(stderr, "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+#endif
+#ifdef __ANDROID__
+        switch (m_nLevel) {
+        case LM_DEADLY:
+            __android_log_print(ANDROID_LOG_FATAL, "neapu_log", "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+            break;
+        case LM_ERROR:
+            __android_log_print(ANDROID_LOG_ERROR, "neapu_log", "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+            break;
+        case LM_WARNING:
+            __android_log_print(ANDROID_LOG_WARN, "neapu_log", "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+            break;
+        case LM_INFO:
+            __android_log_print(ANDROID_LOG_INFO, "neapu_log", "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+            break;
+        case LM_DEBUG:
+            __android_log_print(ANDROID_LOG_DEBUG, "neapu_log", "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+            break;
+        case LM_VERBOSE:
+            __android_log_print(ANDROID_LOG_VERBOSE, "neapu_log", "%s%s[%s]%s\n", GetTime().c_str(), getLevelFlag(m_nLevel, false), threadId.c_str(), m_data.ToCString());
+            break;
+        }
 #endif
     }
 }
