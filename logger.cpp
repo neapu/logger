@@ -16,6 +16,20 @@
 #include <android/log.h>
 #endif
 
+namespace {
+std::string clipFileName(const std::string& fileName)
+{
+    size_t pos = fileName.find_last_of('/');
+    if (pos == std::string::npos) {
+        pos = fileName.find_last_of('\\');
+    }
+    if (pos == std::string::npos) {
+        return fileName;
+    }
+    return fileName.substr(pos + 1);
+}
+}
+
 namespace neapu {
 LogLevel Logger::m_printLevel = LogLevel::LM_DEBUG;
 LogLevel Logger::m_logLevel = LogLevel::LM_NOLOG;
@@ -25,6 +39,18 @@ std::string Logger::m_logFileName;
 FILE* Logger::m_pFile = nullptr;
 std::mutex Logger::m_fileMutex;
 bool Logger::m_firstLog = true;
+
+FunctionTracer::FunctionTracer(LogLevel level, const std::source_location& loc)
+    : m_level(level)
+    , m_loc(loc)
+{
+    Logger(level, {}) << "[FuncTrace]Enter function: [" << clipFileName(loc.file_name()) << ":" << loc.function_name() << "]";
+}
+
+FunctionTracer::~FunctionTracer()
+{
+    Logger(m_level, {}) << "[FuncTrace]Leave function: [" << clipFileName(m_loc.file_name()) << ":" << m_loc.function_name() << "]";
+}
 
 void Logger::setPrintLevel(const LogLevel level)
 {
@@ -93,8 +119,11 @@ std::string Logger::makeLogString(const LogLevel level, const std::source_locati
     default: logLevel = "Unknown";
         break;
     }
-    return std::format("[{}][{}][{}][{}:{}][{}]: {}", getTimeString(), logLevel, threadId, loc.file_name(), loc.line(), loc.function_name(),
-                       logText);
+    if (loc.line() == 0) {
+        return std::format("[{}][{}][{}]: {}", getTimeString(), logLevel, threadId, logText);
+    }
+    return std::format("[{}][{}][{}][{}:{}][{}]: {}", getTimeString(), logLevel, threadId, clipFileName(loc.file_name()), loc.line(),
+                       loc.function_name(), logText);
 }
 
 std::string Logger::getTimeString()

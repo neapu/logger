@@ -6,6 +6,17 @@
 #include <sstream>
 #include <mutex>
 
+#ifdef ENABLE_OLD_STYLE_LOG
+#define LOG_DEBUG neapu::Logger(neapu::LogLevel::LM_DEBUG, std::source_location::current())
+#define LOG_INFO neapu::Logger(neapu::LogLevel::LM_INFO, std::source_location::current())
+#define LOG_WARNING neapu::Logger(neapu::LogLevel::LM_WARNING, std::source_location::current())
+#define LOG_ERROR neapu::Logger(neapu::LogLevel::LM_ERROR, std::source_location::current())
+#define LOG_DEADLY neapu::Logger(neapu::LogLevel::LM_DEADLY, std::source_location::current())
+#define LOG_VERBOSE neapu::Logger(neapu::LogLevel::LM_VERBOSE, std::source_location::current())
+#endif
+
+#define FUNC_TRACE neapu::FunctionTracer __tracer__
+
 namespace neapu {
 enum LogLevel {
     LM_NOLOG = 0,
@@ -15,6 +26,16 @@ enum LogLevel {
     LM_INFO = 4,
     LM_DEBUG = 5,
     LM_VERBOSE = 6
+};
+
+class FunctionTracer final {
+public:
+    FunctionTracer(LogLevel level = LM_DEBUG, const std::source_location& loc = std::source_location::current());
+    ~FunctionTracer();
+
+private:
+    LogLevel m_level;
+    std::source_location m_loc;
 };
 
 class Logger final {
