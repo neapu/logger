@@ -30,7 +30,7 @@ enum LogLevel {
 
 class FunctionTracer final {
 public:
-    FunctionTracer(LogLevel level = LM_DEBUG, const std::source_location& loc = std::source_location::current());
+    explicit FunctionTracer(LogLevel level = LM_DEBUG, const std::source_location& loc = std::source_location::current());
     ~FunctionTracer();
 
 private:
@@ -42,6 +42,7 @@ class Logger final {
 public:
     static void setPrintLevel(LogLevel level);
     static void setLogLevel(LogLevel level, const std::string& logPath, const std::string& logPrefix = "");
+    static void disableFuncName(const bool disable = true) { m_disableFuncName = disable; }
 
     explicit Logger(LogLevel level, const std::source_location& loc = std::source_location::current());
     ~Logger();
@@ -65,42 +66,54 @@ public:
     {
         return Logger(LogLevel::LM_DEADLY, loc).format(fmt, std::forward<Args>(args)...);
     }
+#ifndef DISABLE_LOG_MACRO
 #define deadly(...) deadly(std::source_location::current() , __VA_ARGS__)
+#endif
 
     template <class... Args>
     static Logger& error(const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
     {
         return Logger(LogLevel::LM_ERROR, loc).format(fmt, std::forward<Args>(args)...);
     }
+#ifndef DISABLE_LOG_MACRO
 #define error(...) error(std::source_location::current() , __VA_ARGS__)
+#endif
 
     template <class... Args>
     static Logger& warning(const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
     {
         return Logger(LogLevel::LM_WARNING, loc).format(fmt, std::forward<Args>(args)...);
     }
+#ifndef DISABLE_LOG_MACRO
 #define warning(...) warning(std::source_location::current() , __VA_ARGS__)
+#endif
 
     template <class... Args>
     static Logger& info(const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
     {
         return Logger(LogLevel::LM_INFO, loc).format(fmt, std::forward<Args>(args)...);
     }
+#ifndef DISABLE_LOG_MACRO
 #define info(...) info(std::source_location::current() , __VA_ARGS__)
+#endif
 
     template <class... Args>
     static Logger& debug(const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
     {
         return Logger(LogLevel::LM_DEBUG, loc).format(fmt, std::forward<Args>(args)...);
     }
+#ifndef DISABLE_LOG_MACRO
 #define debug(...) debug(std::source_location::current() , __VA_ARGS__)
+#endif
 
     template <class... Args>
     static Logger& verbose(const std::source_location& loc, std::format_string<Args...> fmt, Args&&... args)
     {
         return Logger(LogLevel::LM_VERBOSE, loc).format(fmt, std::forward<Args>(args)...);
     }
+#ifndef DISABLE_LOG_MACRO
 #define verbose(...) verbose(std::source_location::current() , __VA_ARGS__)
+#endif
 
 private:
     static std::string makeLogString(LogLevel level, const std::source_location& loc, const std::string& logText);
@@ -121,6 +134,7 @@ private:
     static FILE* m_pFile;
     static std::mutex m_fileMutex;
     static bool m_firstLog;
+    static bool m_disableFuncName;
 };
 } // namespace neapu
 

@@ -39,6 +39,7 @@ std::string Logger::m_logFileName;
 FILE* Logger::m_pFile = nullptr;
 std::mutex Logger::m_fileMutex;
 bool Logger::m_firstLog = true;
+bool Logger::m_disableFuncName = false;
 
 FunctionTracer::FunctionTracer(LogLevel level, const std::source_location& loc)
     : m_level(level)
@@ -122,8 +123,13 @@ std::string Logger::makeLogString(const LogLevel level, const std::source_locati
     if (loc.line() == 0) {
         return std::format("[{}][{}][{}]: {}", getTimeString(), logLevel, threadId, logText);
     }
+
+    if (m_disableFuncName) {
+        return std::format("[{}][{}][{}][{}:{}]: {}", getTimeString(), logLevel, threadId, clipFileName(loc.file_name()), loc.line(), logText);
+    }
+
     return std::format("[{}][{}][{}][{}:{}][{}]: {}", getTimeString(), logLevel, threadId, clipFileName(loc.file_name()), loc.line(),
-                       loc.function_name(), logText);
+                      loc.function_name(), logText);
 }
 
 std::string Logger::getTimeString()
