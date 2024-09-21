@@ -138,9 +138,9 @@ std::string Logger::getTimeString()
     const auto now = system_clock::now();
     const auto now_c = system_clock::to_time_t(now);
     const auto now_ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
-    auto [tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst] = *std::localtime(&now_c);
-    return std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:03d}", tm_year + 1900, tm_mon + 1, tm_mday,
-                       tm_hour, tm_min, tm_sec, now_ms.count());
+    std::tm tm = *std::localtime(&now_c);
+    return std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:03d}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                       tm.tm_hour, tm.tm_min, tm.tm_sec, now_ms.count());
 }
 
 void Logger::printLog(const LogLevel level, const std::string& logText)
