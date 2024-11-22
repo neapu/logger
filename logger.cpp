@@ -17,51 +17,43 @@
 #endif
 
 namespace {
-std::string clipFileName(const std::string& fileName)
-{
-    size_t pos = fileName.find_last_of('/');
-    if (pos == std::string::npos) {
-        pos = fileName.find_last_of('\\');
-    }
-    if (pos == std::string::npos) {
-        return fileName;
-    }
-    return fileName.substr(pos + 1);
-}
+const char* LogLevelText[] = { "NOLOG", "ERROR", "WARNING", "INFO", "DEBUG"};
 }
 
 namespace neapu {
-LogLevel Logger::m_printLevel = LogLevel::LM_DEBUG;
-LogLevel Logger::m_logLevel = LogLevel::LM_NOLOG;
+int Logger::m_printLevel = NEAPU_LOG_LEVEL;
+int Logger::m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
 std::string Logger::m_logPath;
 std::string Logger::m_logPrefix;
 std::string Logger::m_logFileName;
 FILE* Logger::m_pFile = nullptr;
 std::mutex Logger::m_fileMutex;
 bool Logger::m_firstLog = true;
-bool Logger::m_disableFuncName = false;
 
-FunctionTracer::FunctionTracer(LogLevel level, const std::source_location& loc)
-    : m_level(level)
-    , m_loc(loc)
+#if !defined(NEAPU_LOG_DISABLE_FUNC_TRACE) && NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
+FunctionTracer::FunctionTracer(int level, const char* fileName, const char* funcName)
+    : m_level(level),
+    m_fileName(fileName),
+    m_funcName(funcName)
 {
-    Logger(level, {}) << "[FuncTrace]Enter function: [" << clipFileName(loc.file_name()) << ":" << loc.function_name() << "]";
+    Logger(level, nullptr, 0, nullptr).format("[FuncTrace]Enter function: [{}][{}]", fileName, funcName);
 }
 
 FunctionTracer::~FunctionTracer()
 {
-    Logger(m_level, {}) << "[FuncTrace]Leave function: [" << clipFileName(m_loc.file_name()) << ":" << m_loc.function_name() << "]";
+    Logger(m_level, nullptr, 0, nullptr).format("[FuncTrace]Leave function: [{}][{}]", m_fileName, m_funcName);
 }
+#endif
 
-void Logger::setPrintLevel(const LogLevel level)
+void Logger::setPrintLevel(const int level)
 {
     m_printLevel = level;
 }
 
-void Logger::setLogLevel(LogLevel level, const std::string& logPath, const std::string& logPrefix)
+void Logger::setLogLevel(int level, const std::string& logPath, const std::string& logPrefix)
 {
     if (logPath.empty()) {
-        m_logLevel = LogLevel::LM_NOLOG;
+        m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
         return;
     }
     m_logPath = logPath;
@@ -72,64 +64,52 @@ void Logger::setLogLevel(LogLevel level, const std::string& logPath, const std::
     if (access(m_logPath.c_str(), 0) == -1) {
         if (mkdir(m_logPath.c_str(), 0744) == -1) {
             std::cerr << "Failed to create log directory: " << m_logPath << std::endl;
-            m_logLevel = LogLevel::LM_NOLOG;
+            m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
             return;
         }
     }
     m_logPrefix = logPrefix;
 }
 
-Logger::Logger(const LogLevel level, const std::source_location& loc)
+Logger::Logger(int level, const char* fileName, int line, const char* funcName)
     : m_level(level)
-    , m_loc(loc)
+    , m_fileName(fileName)
+    , m_line(line)
+    , m_funcName(funcName)
 {
 }
 
 Logger::~Logger()
 {
     if (m_level <= m_printLevel || m_level <= m_logLevel) {
-        const std::string logText = makeLogString(m_level, m_loc, m_data.str());
+        const std::string logText = makeLogString(m_level);
         printLog(m_level, logText);
         writeLog(m_level, logText);
     }
 }
 
-std::string Logger::makeLogString(const LogLevel level, const std::source_location& loc, const std::string& logText)
+std::string Logger::makeLogString(int level)
 {
     std::string threadId;
 #ifdef _WIN32
     threadId = std::to_string(GetCurrentThreadId());
 #else
-    pthread_t tid = pthread_self();
-    threadId = std::to_string((uint64_t)tid);
+    const pthread_t tid = pthread_self();
+    threadId = std::to_string(tid);
 #endif
-    std::string logLevel;
-    switch (level) {
-    case LogLevel::LM_DEADLY: logLevel = "Deadly";
-        break;
-    case LogLevel::LM_ERROR: logLevel = "Error";
-        break;
-    case LogLevel::LM_WARNING: logLevel = "Warning";
-        break;
-    case LogLevel::LM_INFO: logLevel = "Info";
-        break;
-    case LogLevel::LM_DEBUG: logLevel = "Debug";
-        break;
-    case LogLevel::LM_VERBOSE: logLevel = "Verbose";
-        break;
-    default: logLevel = "Unknown";
-        break;
-    }
-    if (loc.line() == 0) {
-        return std::format("[{}][{}][{}]: {}", getTimeString(), logLevel, threadId, logText);
+    std::string logText;
+    if (!m_fileName || !m_line || !m_funcName) {
+        logText = std::format("[{}][{}]", getTimeString(), threadId);
+    } else {
+        if (level < 0 || level >= std::size(LogLevelText)) {
+            level = 0;
+        }
+        std::string logLevel = LogLevelText[level];
+        logText = std::format("[{}][{}][{}][{}:{}][{}]", getTimeString(), threadId, logLevel, m_fileName, m_line, m_funcName);
     }
 
-    if (m_disableFuncName) {
-        return std::format("[{}][{}][{}][{}:{}]: {}", getTimeString(), logLevel, threadId, clipFileName(loc.file_name()), loc.line(), logText);
-    }
-
-    return std::format("[{}][{}][{}][{}:{}][{}]: {}", getTimeString(), logLevel, threadId, clipFileName(loc.file_name()), loc.line(),
-                      loc.function_name(), logText);
+    logText += m_data.str();
+    return logText;
 }
 
 std::string Logger::getTimeString()
@@ -143,35 +123,29 @@ std::string Logger::getTimeString()
                        tm.tm_hour, tm.tm_min, tm.tm_sec, now_ms.count());
 }
 
-void Logger::printLog(const LogLevel level, const std::string& logText)
+void Logger::printLog(int level, const std::string& logText)
 {
     if (level > m_printLevel) return;
     std::cout << logText << std::endl;
 #ifdef __ANDROID__
     switch (m_level) {
-    case LM_DEADLY:
-        __android_log_print(ANDROID_LOG_FATAL, "neapu_log", "%s\n", logText.c_str());
-        break;
-    case LM_ERROR:
+    case NEAPU_LOG_LEVEL_ERROR:
         __android_log_print(ANDROID_LOG_ERROR, "neapu_log", "%s\n", logText.c_str());
         break;
-    case LM_WARNING:
+    case NEAPU_LOG_LEVEL_WARNING:
         __android_log_print(ANDROID_LOG_WARN, "neapu_log", "%s\n", logText.c_str());
         break;
-    case LM_INFO:
+    case NEAPU_LOG_LEVEL_INFO:
         __android_log_print(ANDROID_LOG_INFO, "neapu_log", "%s\n", logText.c_str());
         break;
-    case LM_DEBUG:
+    case NEAPU_LOG_LEVEL_DEBUG:
         __android_log_print(ANDROID_LOG_DEBUG, "neapu_log", "%s\n", logText.c_str());
-        break;
-    case LM_VERBOSE:
-        __android_log_print(ANDROID_LOG_VERBOSE, "neapu_log", "%s\n", logText.c_str());
         break;
     }
 #endif
 }
 
-void Logger::writeLog(const LogLevel level, const std::string& logText)
+void Logger::writeLog(int level, const std::string& logText)
 {
     if (level > m_logLevel) return;
     if (m_logPath.empty()) return;
