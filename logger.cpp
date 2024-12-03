@@ -93,6 +93,8 @@ std::string Logger::makeLogString(int level)
     std::string threadId;
 #ifdef _WIN32
     threadId = std::to_string(GetCurrentThreadId());
+#elif defined(__APPLE__)
+    threadId = std::to_string(pthread_mach_thread_np(pthread_self()));
 #else
     const pthread_t tid = pthread_self();
     threadId = std::to_string(tid);
