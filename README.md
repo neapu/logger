@@ -4,6 +4,10 @@
 
 A simple logger library, support log level, log format, log output to file, log output to console and so on.
 
+## Lite
+
+基于2.0.1, 更轻量化的版本，可用于嵌入式系统
+
 ## How to use
 
 ```cmake
