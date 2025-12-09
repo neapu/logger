@@ -21,8 +21,8 @@ const char* LogLevelText[] = { "NOLOG", "ERROR", "WARNING", "INFO", "DEBUG"};
 }
 
 namespace neapu {
-int Logger::m_printLevel = NEAPU_LOG_LEVEL;
-int Logger::m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
+LogLevel Logger::m_printLevel = static_cast<LogLevel>(NEAPU_LOG_LEVEL);
+LogLevel Logger::m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
 std::string Logger::m_logPath;
 std::string Logger::m_logPrefix;
 std::string Logger::m_logFileName;
@@ -31,26 +31,28 @@ std::mutex Logger::m_fileMutex;
 bool Logger::m_firstLog = true;
 
 #if !defined(NEAPU_LOG_DISABLE_FUNC_TRACE) && NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
-FunctionTracer::FunctionTracer(int level, const char* fileName, const char* funcName)
+FunctionTracer::FunctionTracer(LogLevel level, const char* fileName, const char* funcName)
     : m_level(level),
     m_fileName(fileName),
     m_funcName(funcName)
 {
-    Logger(level, nullptr, 0, nullptr).format("[FuncTrace]Enter function: [{}][{}]", fileName, funcName);
+    // Logger(level, nullptr, 0, nullptr).format("[FuncTrace]Enter function: [{}][{}]", fileName, funcName);
+    Logger(level, fileName, 0, funcName) << "[FuncTrace]Enter function: [" << fileName << "][" << funcName << "]";
 }
 
 FunctionTracer::~FunctionTracer()
 {
-    Logger(m_level, nullptr, 0, nullptr).format("[FuncTrace]Leave function: [{}][{}]", m_fileName, m_funcName);
+    // Logger(m_level, nullptr, 0, nullptr).format("[FuncTrace]Leave function: [{}][{}]", m_fileName, m_funcName);
+    Logger(m_level, m_fileName, 0, m_funcName) << "[FuncTrace]Leave function: [" << m_fileName << "][" << m_funcName << "]";
 }
 #endif
 
-void Logger::setPrintLevel(const int level)
+void Logger::setPrintLevel(const LogLevel level)
 {
     m_printLevel = level;
 }
 
-void Logger::setLogLevel(int level, const std::string& logPath, const std::string& logPrefix)
+void Logger::setLogLevel(LogLevel level, const std::string& logPath, const std::string& logPrefix)
 {
     if (logPath.empty()) {
         m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
@@ -71,13 +73,27 @@ void Logger::setLogLevel(int level, const std::string& logPath, const std::strin
     m_logPrefix = logPrefix;
 }
 
-Logger::Logger(int level, const char* fileName, int line, const char* funcName)
+Logger::Logger(LogLevel level, const char* fileName, int line, const char* funcName)
     : m_level(level)
     , m_fileName(fileName)
     , m_line(line)
     , m_funcName(funcName)
 {
 }
+
+#if __cplusplus >= 202002L
+Logger::Logger(LogLevel level, const std::source_location& location)
+    : m_level(level)
+#ifdef _WIN32
+    , m_fileName(strrchr(location.file_name(), '\\') ? strrchr(location.file_name(), '\\') + 1 : location.file_name())
+#else
+    , m_fileName(strrchr(location.file_name(), '/') ? strrchr(location.file_name(), '/') + 1 : location.file_name())
+#endif
+    , m_line(static_cast<int>(location.line()))
+    , m_funcName(location.function_name())
+{
+}
+#endif
 
 Logger::~Logger()
 {
@@ -88,7 +104,7 @@ Logger::~Logger()
     }
 }
 
-std::string Logger::makeLogString(int level)
+std::string Logger::makeLogString(LogLevel level)
 {
     std::string threadId;
 #ifdef _WIN32
@@ -101,13 +117,26 @@ std::string Logger::makeLogString(int level)
 #endif
     std::string logText;
     if (!m_fileName || !m_line || !m_funcName) {
+#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
         logText = std::format("[{}][{}]", getTimeString(), threadId);
+#elif defined(ENABLE_FMT_LIB)
+        logText = fmt::format("[{}][{}]", getTimeString(), threadId);
+#else
+        std::stringstream ss;
+        ss << "[" << getTimeString() << "][" << threadId << "]";
+        logText = ss.str();
+#endif
     } else {
-        if (level < 0 || level >= std::size(LogLevelText)) {
-            level = 0;
-        }
-        std::string logLevel = LogLevelText[level];
+        std::string logLevel = LogLevelText[static_cast<int>(level)];
+#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
         logText = std::format("[{}][{}][{}][{}:{}][{}]", getTimeString(), threadId, logLevel, m_fileName, m_line, m_funcName);
+#elif defined(ENABLE_FMT_LIB)
+        logText = fmt::format("[{}][{}][{}][{}:{}][{}]", getTimeString(), threadId, logLevel, m_fileName, m_line, m_funcName);
+#else
+        std::stringstream ss;
+        ss << "[" << getTimeString() << "][" << threadId << "][" << logLevel << "][" << m_fileName << ":" << m_line << "][" << m_funcName << "]";
+        logText = ss.str();
+#endif
     }
 
     logText += m_data.str();
@@ -121,11 +150,21 @@ std::string Logger::getTimeString()
     const auto now_c = system_clock::to_time_t(now);
     const auto now_ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
     std::tm tm = *std::localtime(&now_c);
+#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
     return std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:03d}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
                        tm.tm_hour, tm.tm_min, tm.tm_sec, now_ms.count());
+#elif defined(ENABLE_FMT_LIB)
+    return fmt::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:03d}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                       tm.tm_hour, tm.tm_min, tm.tm_sec, now_ms.count());
+#else
+    char buffer[64];
+    std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d.%03d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                       tm.tm_hour, tm.tm_min, tm.tm_sec, (int)now_ms.count());
+    return std::string(buffer);
+#endif
 }
 
-void Logger::printLog(int level, const std::string& logText)
+void Logger::printLog(LogLevel level, const std::string& logText)
 {
     if (level > m_printLevel) return;
     std::cout << logText << std::endl;
@@ -147,7 +186,7 @@ void Logger::printLog(int level, const std::string& logText)
 #endif
 }
 
-void Logger::writeLog(int level, const std::string& logText)
+void Logger::writeLog(LogLevel level, const std::string& logText)
 {
     if (level > m_logLevel) return;
     if (m_logPath.empty()) return;
