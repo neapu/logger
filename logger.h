@@ -115,6 +115,19 @@ constexpr auto NEAPU_LOG_LEVEL_DEBUG = neapu::LogLevel::DEBUG;
 #else
 #define NEAPU_FUNC_TRACE
 #endif
+
+#ifndef NEAPU_LOG_NO_SHORT_MACROS
+#define LOGE(...) NEAPU_LOGE(__VA_ARGS__)
+#define LOGW(...) NEAPU_LOGW(__VA_ARGS__)
+#define LOGI(...) NEAPU_LOGI(__VA_ARGS__)
+#define LOGD(...) NEAPU_LOGD(__VA_ARGS__)
+#define LOGE_STREAM NEAPU_LOGE_STREAM
+#define LOGW_STREAM NEAPU_LOGW_STREAM
+#define LOGI_STREAM NEAPU_LOGI_STREAM
+#define LOGD_STREAM NEAPU_LOGD_STREAM
+#define FUNC_TRACE NEAPU_FUNC_TRACE
+#endif
+
 namespace neapu {
 #if !defined(NEAPU_LOG_DISABLE_FUNC_TRACE) && NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
 class FunctionTracer final {

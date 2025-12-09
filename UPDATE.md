@@ -15,3 +15,4 @@
 3. 增加了对低版本 C++（< C++20）且未启用 `fmt` 库的兼容性支持。在此配置下，日志宏将失效或使用 `stringstream` 降级处理，确保项目能编译通过。
 4. 重构了日志级别类型，由 `int` 改为 `enum class LogLevel`，增强了类型安全。
 5. 优化了 CMake 配置，修复了链接库的可见性问题。
+6. 增加了简短的宏定义 `LOGE`, `LOGW`, `LOGI`, `LOGD` 等，方便使用。如果与现有宏冲突，可以定义 `NEAPU_LOG_NO_SHORT_MACROS` 来禁用它们。
