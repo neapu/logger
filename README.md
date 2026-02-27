@@ -9,18 +9,10 @@ A simple logger library, support log level, log format, log output to file, log 
 ### CMake Configuration
 
 ```cmake
-# Set log level (Optional, default is DEBUG)
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_definitions(-DNEAPU_LOG_LEVEL=NEAPU_LOG_LEVEL_DEBUG)
-else()
-    add_definitions(-DNEAPU_LOG_LEVEL=NEAPU_LOG_LEVEL_INFO)
-endif ()
-
-# Enable fmt library support (Optional, requires fmt library)
-# set(ENABLE_FMT_LIB ON)
-
-# Disable short macros (LOGI, LOGE, etc.) if they conflict with other libraries
-# add_definitions(-DNEAPU_LOG_NO_SHORT_MACROS)
+# logger requires C++20
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(logger)
 target_link_libraries(your_target PRIVATE logger)
@@ -30,31 +22,48 @@ target_link_libraries(your_target PRIVATE logger)
 
 ```c++
 #include "logger/logger.h"
+using namespace logger;
 
 // ...
 
-// Use short macros (if not disabled)
-LOGI("Hello, {}", "World"); // Requires C++20 or ENABLE_FMT_LIB
-LOGW("Warning message");
+// Optional: console and file level
+Logger::setPrintLevel(LogLevel::INFO);   // print <= INFO to console
+Logger::setLogLevel(LogLevel::DEBUG);    // write <= DEBUG to file
 
-// Use stream style
-LOGI_STREAM << "Hello, " << "World";
+// Optional: file output
+Logger::setLogPath("./logs");
 
-// Use full name macros (always available)
-NEAPU_LOGE("Error: {}", 404);
-NEAPU_LOGD_STREAM << "Debug info";
+// Optional: file rotate (default 1MB)
+Logger::setMaxFileSize(5 * 1024 * 1024); // 5MB
 
-// Function tracing
+// Optional: enable/disable lock (default true)
+Logger::setLockingEnabled(true);
+
+// Basic logging (default channel: "Default")
+LogInfo() << "service started";
+LogWarn() << "memory high: " << 82 << "%";
+
+// Channel logging (separate files per channel)
+LogDebug("NET") << "connected to " << host;
+LogError("DB").format("query failed, code={} sql={}", code, sql);
+
+// Function trace (RAII)
 void myFunction() {
-    FUNC_TRACE; // Logs entry and exit of the function
+    FunctionTracer trace(LogLevel::INFO, "CORE");
     // ...
-}
+} // auto emit [EXIT]
 
 // ...
 ```
 
+### Log Output Behavior
+
+- Each message includes: time, channel, level, thread id, file name and line number.
+- If `setLogPath()` is set, logs are written to `<logPath>/<channel>.log`.
+- When file size exceeds `setMaxFileSize()`, old file is moved to `<logPath>/old/<channel>_<timestamp>.log`.
+- First write of each file appends a header line with process id.
+
 ### Requirements
 
--   **C++20**: For `std::format` and `std::source_location` support by default.
--   **C++11/14/17**: Can be used with `ENABLE_FMT_LIB` (requires `fmt` library) for formatting support.
-    -   Without `fmt` and < C++20: Formatting macros (`LOGI`, `NEAPU_LOGI` etc.) will degrade to `stringstream` (no format string support) or become no-ops depending on configuration, but compilation will succeed. Stream macros (`LOGI_STREAM`) work normally.
+- **C++20**
+- Supported platforms: Linux / macOS / Windows (Android links `log` automatically in CMake)

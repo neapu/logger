@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(logger VERSION 3.0.1)
+project(logger VERSION 4.0.1)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 if(WIN32)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 else()
@@ -20,9 +25,4 @@ if (LINUX OR APPLE)
 endif()
 if (ANDROID)
     target_link_libraries(${PROJECT_NAME} PRIVATE log)
-endif()
-
-if (ENABLE_FMT_LIB)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_FMT_LIB)
-    target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 endif()

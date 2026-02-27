@@ -1,191 +1,121 @@
-#ifndef LOGGER_H_
-#define LOGGER_H_
-#include <string>
-#if defined(ENABLE_FMT_LIB)
-#include <fmt/format.h>
-#endif
-#if __cplusplus >= 202002L
-#include <format>
-#endif
+#pragma once
+
 #include <sstream>
-#include <mutex>
-#include <cstring>
-#if __cplusplus >= 202002L
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <format>
 #include <source_location>
-#endif
-
+#include <chrono>
+#include <map>
+#include <fstream>
+#include <filesystem>
+#include <mutex>
+#include <atomic>
+#include <ctime>
 #ifdef _WIN32
-#define __FILENAME__ (strrchr(__FILE__, '\\') ? (strrchr(__FILE__, '\\') + 1) : __FILE__)
+
+#include <stringapiset.h>
+#include <process.h>
 #else
-#define __FILENAME__ (strrchr(__FILE__, '/') ? (strrchr(__FILE__, '/') + 1) : __FILE__)
+#include <unistd.h>
 #endif
+#include <thread>
 
-// #define NEAPU_LOG_LEVEL_NOLOG neapu::LogLevel::NOLOG
-// #define NEAPU_LOG_LEVEL_ERROR neapu::LogLevel::ERROR
-// #define NEAPU_LOG_LEVEL_WARNING neapu::LogLevel::WARNING
-// #define NEAPU_LOG_LEVEL_INFO neapu::LogLevel::INFO
-// #define NEAPU_LOG_LEVEL_DEBUG neapu::LogLevel::DEBUG
-
-namespace neapu {
+namespace logger {
 enum class LogLevel {
-    NOLOG = 0,
+    NONE = 0,
     ERROR = 1,
-    WARNING = 2,
+    WARN = 2,
     INFO = 3,
     DEBUG = 4
 };
-}
+std::ostream& operator<<(std::ostream& os, LogLevel level);
 
-constexpr auto NEAPU_LOG_LEVEL_NOLOG = neapu::LogLevel::NOLOG;
-constexpr auto NEAPU_LOG_LEVEL_ERROR = neapu::LogLevel::ERROR;
-constexpr auto NEAPU_LOG_LEVEL_WARNING = neapu::LogLevel::WARNING;
-constexpr auto NEAPU_LOG_LEVEL_INFO = neapu::LogLevel::INFO;
-constexpr auto NEAPU_LOG_LEVEL_DEBUG = neapu::LogLevel::DEBUG;
-
-#ifndef NEAPU_LOG_LEVEL
-#define NEAPU_LOG_LEVEL NEAPU_LOG_LEVEL_DEBUG
-#endif
-
-#if NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_ERROR
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGE(...) neapu::Logger(neapu::LogLevel::ERROR, std::source_location::current()) << std::format(__VA_ARGS__)
-#elif __cplusplus >= 202002L && defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGE(...) neapu::Logger(neapu::LogLevel::ERROR, std::source_location::current()) << fmt::format(__VA_ARGS__)
-#elif defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGE(...) neapu::Logger(neapu::LogLevel::ERROR, __FILENAME__, __LINE__, __FUNCTION__) << fmt::format(__VA_ARGS__)
-#else
-#define NEAPU_LOGE(...)
-#endif
-#define NEAPU_LOGE_STREAM neapu::Logger(neapu::LogLevel::ERROR, __FILENAME__, __LINE__, __FUNCTION__)
-#else
-#define NEAPU_LOGE(...)
-#define NEAPU_LOGE_STREAM if (false) neapu::Logger(neapu::LogLevel::ERROR, __FILENAME__, __LINE__, __FUNCTION__)
-#endif
-
-#if NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_WARNING
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGW(...) neapu::Logger(neapu::LogLevel::WARNING, std::source_location::current()) << std::format(__VA_ARGS__)
-#elif __cplusplus >= 202002L && defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGW(...) neapu::Logger(neapu::LogLevel::WARNING, std::source_location::current()) << fmt::format(__VA_ARGS__)
-#elif defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGW(...) neapu::Logger(neapu::LogLevel::WARNING, __FILENAME__, __LINE__, __FUNCTION__) << fmt::format(__VA_ARGS__)
-#else
-#define NEAPU_LOGW(...)
-#endif
-#define NEAPU_LOGW_STREAM neapu::Logger(neapu::LogLevel::WARNING, __FILENAME__, __LINE__, __FUNCTION__)
-#else
-#define NEAPU_LOGW(...)
-#define NEAPU_LOGW_STREAM if (false) neapu::Logger(neapu::LogLevel::WARNING, __FILENAME__, __LINE__, __FUNCTION__)
-#endif
-
-#if NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGI(...) neapu::Logger(neapu::LogLevel::INFO, std::source_location::current()) << std::format(__VA_ARGS__)
-#elif __cplusplus >= 202002L && defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGI(...) neapu::Logger(neapu::LogLevel::INFO, std::source_location::current()) << fmt::format(__VA_ARGS__)
-#elif defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGI(...) neapu::Logger(neapu::LogLevel::INFO, __FILENAME__, __LINE__, __FUNCTION__) << fmt::format(__VA_ARGS__)
-#else
-#define NEAPU_LOGI(...)
-#endif
-#define NEAPU_LOGI_STREAM neapu::Logger(neapu::LogLevel::INFO, __FILENAME__, __LINE__, __FUNCTION__)
-#else
-#define NEAPU_LOGI(...)
-#define NEAPU_LOGI_STREAM if (false) neapu::Logger(neapu::LogLevel::INFO, __FILENAME__, __LINE__, __FUNCTION__)
-#endif
-
-#if NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_DEBUG
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGD(...) neapu::Logger(neapu::LogLevel::DEBUG, std::source_location::current()) << std::format(__VA_ARGS__)
-#elif __cplusplus >= 202002L && defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGD(...) neapu::Logger(neapu::LogLevel::DEBUG, std::source_location::current()) << fmt::format(__VA_ARGS__)
-#elif defined(ENABLE_FMT_LIB)
-#define NEAPU_LOGD(...) neapu::Logger(neapu::LogLevel::DEBUG, __FILENAME__, __LINE__, __FUNCTION__) << fmt::format(__VA_ARGS__)
-#else
-#define NEAPU_LOGD(...)
-#endif
-#define NEAPU_LOGD_STREAM neapu::Logger(neapu::LogLevel::DEBUG, __FILENAME__, __LINE__, __FUNCTION__)
-#else
-#define NEAPU_LOGD(...)
-#define NEAPU_LOGD_STREAM if (false) neapu::Logger(neapu::LogLevel::DEBUG, __FILENAME__, __LINE__, __FUNCTION__)
-#endif
-
-#if !defined(NEAPU_LOG_DISABLE_FUNC_TRACE) && NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
-#define NEAPU_FUNC_TRACE neapu::FunctionTracer __tracer__(NEAPU_LOG_LEVEL_INFO, __FILENAME__, __FUNCTION__)
-#else
-#define NEAPU_FUNC_TRACE
-#endif
-
-#ifndef NEAPU_LOG_NO_SHORT_MACROS
-#define LOGE(...) NEAPU_LOGE(__VA_ARGS__)
-#define LOGW(...) NEAPU_LOGW(__VA_ARGS__)
-#define LOGI(...) NEAPU_LOGI(__VA_ARGS__)
-#define LOGD(...) NEAPU_LOGD(__VA_ARGS__)
-#define LOGE_STREAM NEAPU_LOGE_STREAM
-#define LOGW_STREAM NEAPU_LOGW_STREAM
-#define LOGI_STREAM NEAPU_LOGI_STREAM
-#define LOGD_STREAM NEAPU_LOGD_STREAM
-#define FUNC_TRACE NEAPU_FUNC_TRACE
-#endif
-
-namespace neapu {
-#if !defined(NEAPU_LOG_DISABLE_FUNC_TRACE) && NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
-class FunctionTracer final {
+class Logger {
 public:
-    FunctionTracer(LogLevel level, const char* fileName, const char* funcName);
-    ~FunctionTracer();
-
-private:
-    LogLevel m_level;
-    const char* m_fileName;
-    const char* m_funcName;
-};
-#endif
-
-class Logger final {
-public:
-    static void setPrintLevel(LogLevel level);
-    static void setLogLevel(LogLevel level, const std::string& logPath, const std::string& logPrefix = "");
-    static void disableFuncName(const bool disable = true) { m_disableFuncName = disable; }
-
-    Logger(LogLevel level, const char* fileName, int line, const char* funcName);
-#if __cplusplus >= 202002L
-    Logger(LogLevel level, const std::source_location& location = std::source_location::current());
-#endif
-
+    Logger(LogLevel level, const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
     ~Logger();
 
+    Logger& operator<<(const char* s);
+    Logger& operator<<(std::string_view sv);
+    Logger& operator<<(const std::string& s);
+#ifdef _WIN32
+    Logger& operator<<(const wchar_t* ws);
+    Logger& operator<<(std::wstring_view wsv);
+    Logger& operator<<(const std::wstring& ws);
+#endif
     template <class T>
+        requires (!std::is_same_v<std::remove_cvref_t<T>, std::wstring>
+               && !std::is_same_v<std::remove_cvref_t<T>, std::wstring_view>
+               && !std::is_same_v<std::remove_cvref_t<T>, const wchar_t*>
+               && !std::is_same_v<std::remove_cvref_t<T>, wchar_t*>)
     Logger& operator<<(T&& t)
     {
         m_data << std::forward<T>(t);
         return *this;
     }
 
-private:
-    std::string makeLogString(LogLevel level);
-    static std::string getTimeString();
-    static void printLog(LogLevel level, const std::string& logText);
-    static void writeLog(LogLevel level, const std::string& logText);
-    static bool openFile();
+    template<typename... Args>
+    Logger& format(std::format_string<Args...> fmt, Args&&... args)
+    {
+        auto formatted = std::format(fmt, std::forward<Args>(args)...);
+        m_data << std::string_view(formatted);
+        return *this;
+    }
+#ifdef _WIN32
+    template<typename... Args>
+    Logger& format_w(std::wformat_string<Args...> fmt, Args&&... args)
+    {
+        auto formatted = std::format(fmt, std::forward<Args>(args)...);
+        const wchar_t* data = formatted.c_str();
+        int len = static_cast<int>(formatted.size());
+        int needed = ::WideCharToMultiByte(CP_UTF8, 0, data, len, nullptr, 0, nullptr, nullptr);
+        if (needed > 0) {
+            std::string out(static_cast<size_t>(needed), '\0');
+            int written = ::WideCharToMultiByte(CP_UTF8, 0, data, len, out.data(), needed, nullptr, nullptr);
+            if (written > 0) {
+                m_data.write(out.data(), static_cast<std::streamsize>(out.size()));
+            }
+        }
+        return *this;
+    }
+#endif
 
+    static void setLogPath(const std::string& path);
+    static void openNewFile(const std::string& channel);
+    static void setMaxFileSize(std::streamoff bytes);
+    static void rotateIfNeeded(const std::string& channel);
+    static void setPrintLevel(LogLevel level) { s_printLevel = level; }
+    static void setLogLevel(LogLevel level) { s_logLevel = level; }
+    static void pureLog(LogLevel level, const std::string& channel, const std::string& message);
+    static void setLockingEnabled(bool enabled);
+private:
+    std::stringstream m_data;
+    LogLevel m_level;
+    std::source_location m_location;
+    std::string m_channel;
+    static std::string s_logPath;
+    static std::map<std::string, std::ofstream> s_ofstreamMap;
+    static std::streamoff s_maxFileSize;
+    static LogLevel s_printLevel;
+    static LogLevel s_logLevel;
+    static std::recursive_mutex s_mutex;
+    static std::atomic<bool> s_lockEnabled;
+};
+Logger LogDebug(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+Logger LogInfo(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+Logger LogWarn(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+Logger LogError(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+
+class FunctionTracer {
+public:
+    explicit FunctionTracer(LogLevel level = LogLevel::INFO, const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+    ~FunctionTracer();
 private:
     LogLevel m_level;
-    std::stringstream m_data;
-    const char* m_fileName;
-    int m_line;
-    const char* m_funcName;
-
-    static LogLevel m_printLevel;
-    static LogLevel m_logLevel;
-    static std::string m_logPath;
-    static std::string m_logPrefix;
-    static std::string m_logFileName;
-    static FILE* m_pFile;
-    static std::mutex m_fileMutex;
-    static bool m_firstLog;
-    static bool m_disableFuncName;
+    std::string m_channel;
+    std::source_location m_location;
+    std::string m_logPrefix;
 };
-} // namespace neapu
-
-#endif // LOGGER_H_
+}

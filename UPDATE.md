@@ -16,3 +16,18 @@
 4. 重构了日志级别类型，由 `int` 改为 `enum class LogLevel`，增强了类型安全。
 5. 优化了 CMake 配置，修复了链接库的可见性问题。
 6. 增加了简短的宏定义 `LOGE`, `LOGW`, `LOGI`, `LOGD` 等，方便使用。如果与现有宏冲突，可以定义 `NEAPU_LOG_NO_SHORT_MACROS` 来禁用它们。
+
+## 4.0.1
+
+相对 3.0.1，本版本是一次偏重 API 收敛与运行时能力重构的升级，包含以下主要变化：
+
+1. **移除宏式日志接口（破坏性变更）**：删除 `NEAPU_LOGE/NEAPU_LOGW/NEAPU_LOGI/NEAPU_LOGD`、`LOGE/LOGW/LOGI/LOGD` 及相关 `_STREAM`/函数跟踪宏，改为 `LogError/LogWarn/LogInfo/LogDebug` 工厂函数与 `Logger` 流式调用。
+2. **放弃对 C++20 以下标准的兼容路径**：CMake 明确要求 C++20，移除 `ENABLE_FMT_LIB` 相关编译开关与链接逻辑，不再提供基于 `fmt` 或旧标准的降级分支。
+3. **命名空间与类型命名调整（破坏性变更）**：日志库命名空间由 `neapu` 调整为 `logger`；日志级别由 `NOLOG/WARNING` 调整为 `NONE/WARN`，旧名称代码需同步替换。
+4. **日志配置接口重构（破坏性变更）**：原 `setLogLevel(level, path, prefix)` 被拆分为 `setLogPath(path)` + `setLogLevel(level)`；日志前缀参数被移除，配置职责更清晰。
+5. **增强多 Channel 输出能力**：日志实例支持显式 `channel`，默认落到 `Default`；文件按 channel 分离（如 `xxx.log`），便于按业务模块隔离排查。
+6. **新增日志滚动策略**：支持 `setMaxFileSize()` 控制单文件大小；超过阈值后自动归档到 `old/` 目录，命名为 `channel_时间戳.log`，并自动创建新文件继续写入。
+7. **并发安全机制升级**：引入 `std::recursive_mutex` 与原子开关，默认开启加锁；可通过 `setLockingEnabled(false)` 在受控场景关闭锁以追求更高吞吐。
+8. **上下文字段与输出细节优化**：日志头统一包含时间、channel、级别、线程 ID、文件名与行号；文件首行新增包含进程 ID 的 HEADER 记录，便于多进程/多模块定位问题。
+
+> 迁移建议：若从 3.0.1 升级，优先完成“宏到函数接口”的替换，以及 `setLogLevel` 调用点拆分；随后检查命名空间与日志级别枚举名称变更。

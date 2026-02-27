@@ -1,224 +1,278 @@
 #include "logger.h"
-#include <chrono>
-#include <iostream>
-#ifdef _WIN32
-#include <io.h>
-#include <direct.h>
-#include <Windows.h>
-#define access _access
-#define mkdir(x, y) _mkdir(x)
-#else
-#include <sys/stat.h>
-#include <unistd.h>
-#include <pthread.h>
-#endif
-#ifdef __ANDROID__
-#include <android/log.h>
-#endif
 
 namespace {
-const char* LogLevelText[] = { "NOLOG", "ERROR", "WARNING", "INFO", "DEBUG"};
-}
-
-namespace neapu {
-LogLevel Logger::m_printLevel = static_cast<LogLevel>(NEAPU_LOG_LEVEL);
-LogLevel Logger::m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
-std::string Logger::m_logPath;
-std::string Logger::m_logPrefix;
-std::string Logger::m_logFileName;
-FILE* Logger::m_pFile = nullptr;
-std::mutex Logger::m_fileMutex;
-bool Logger::m_firstLog = true;
-
-#if !defined(NEAPU_LOG_DISABLE_FUNC_TRACE) && NEAPU_LOG_LEVEL >= NEAPU_LOG_LEVEL_INFO
-FunctionTracer::FunctionTracer(LogLevel level, const char* fileName, const char* funcName)
-    : m_level(level),
-    m_fileName(fileName),
-    m_funcName(funcName)
+unsigned long getProcessId()
 {
-    // Logger(level, nullptr, 0, nullptr).format("[FuncTrace]Enter function: [{}][{}]", fileName, funcName);
-    Logger(level, fileName, 0, funcName) << "[FuncTrace]Enter function: [" << fileName << "][" << funcName << "]";
-}
-
-FunctionTracer::~FunctionTracer()
-{
-    // Logger(m_level, nullptr, 0, nullptr).format("[FuncTrace]Leave function: [{}][{}]", m_fileName, m_funcName);
-    Logger(m_level, m_fileName, 0, m_funcName) << "[FuncTrace]Leave function: [" << m_fileName << "][" << m_funcName << "]";
-}
-#endif
-
-void Logger::setPrintLevel(const LogLevel level)
-{
-    m_printLevel = level;
-}
-
-void Logger::setLogLevel(LogLevel level, const std::string& logPath, const std::string& logPrefix)
-{
-    if (logPath.empty()) {
-        m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
-        return;
-    }
-    m_logPath = logPath;
-    if (m_logPath.back() != '/' && m_logPath.back() != '\\') {
-        m_logPath += '/';
-    }
-    m_logLevel = level;
-    if (access(m_logPath.c_str(), 0) == -1) {
-        if (mkdir(m_logPath.c_str(), 0744) == -1) {
-            std::cerr << "Failed to create log directory: " << m_logPath << std::endl;
-            m_logLevel = NEAPU_LOG_LEVEL_NOLOG;
-            return;
-        }
-    }
-    m_logPrefix = logPrefix;
-}
-
-Logger::Logger(LogLevel level, const char* fileName, int line, const char* funcName)
-    : m_level(level)
-    , m_fileName(fileName)
-    , m_line(line)
-    , m_funcName(funcName)
-{
-}
-
-#if __cplusplus >= 202002L
-Logger::Logger(LogLevel level, const std::source_location& location)
-    : m_level(level)
 #ifdef _WIN32
-    , m_fileName(strrchr(location.file_name(), '\\') ? strrchr(location.file_name(), '\\') + 1 : location.file_name())
+    return static_cast<unsigned long>(_getpid());
 #else
-    , m_fileName(strrchr(location.file_name(), '/') ? strrchr(location.file_name(), '/') + 1 : location.file_name())
+    return static_cast<unsigned long>(getpid());
 #endif
-    , m_line(static_cast<int>(location.line()))
-    , m_funcName(location.function_name())
-{
 }
-#endif
-
-Logger::~Logger()
-{
-    if (m_level <= m_printLevel || m_level <= m_logLevel) {
-        const std::string logText = makeLogString(m_level);
-        printLog(m_level, logText);
-        writeLog(m_level, logText);
-    }
-}
-
-std::string Logger::makeLogString(LogLevel level)
-{
-    std::string threadId;
-#ifdef _WIN32
-    threadId = std::to_string(GetCurrentThreadId());
-#elif defined(__APPLE__)
-    threadId = std::to_string(pthread_mach_thread_np(pthread_self()));
-#else
-    const pthread_t tid = pthread_self();
-    threadId = std::to_string(tid);
-#endif
-    std::string logText;
-    if (!m_fileName || !m_line || !m_funcName) {
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-        logText = std::format("[{}][{}]", getTimeString(), threadId);
-#elif defined(ENABLE_FMT_LIB)
-        logText = fmt::format("[{}][{}]", getTimeString(), threadId);
-#else
-        std::stringstream ss;
-        ss << "[" << getTimeString() << "][" << threadId << "]";
-        logText = ss.str();
-#endif
-    } else {
-        std::string logLevel = LogLevelText[static_cast<int>(level)];
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-        logText = std::format("[{}][{}][{}][{}:{}][{}]", getTimeString(), threadId, logLevel, m_fileName, m_line, m_funcName);
-#elif defined(ENABLE_FMT_LIB)
-        logText = fmt::format("[{}][{}][{}][{}:{}][{}]", getTimeString(), threadId, logLevel, m_fileName, m_line, m_funcName);
-#else
-        std::stringstream ss;
-        ss << "[" << getTimeString() << "][" << threadId << "][" << logLevel << "][" << m_fileName << ":" << m_line << "][" << m_funcName << "]";
-        logText = ss.str();
-#endif
-    }
-
-    logText += m_data.str();
-    return logText;
-}
-
-std::string Logger::getTimeString()
+std::string getTimeString()
 {
     using namespace std::chrono;
     const auto now = system_clock::now();
-    const auto now_c = system_clock::to_time_t(now);
-    const auto now_ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
-    std::tm tm = *std::localtime(&now_c);
-#if __cplusplus >= 202002L && !defined(ENABLE_FMT_LIB)
-    return std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:03d}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                       tm.tm_hour, tm.tm_min, tm.tm_sec, now_ms.count());
-#elif defined(ENABLE_FMT_LIB)
-    return fmt::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}.{:03d}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                       tm.tm_hour, tm.tm_min, tm.tm_sec, now_ms.count());
+    const auto sec_tp = floor<seconds>(now);
+    const auto ms = duration_cast<milliseconds>(now - sec_tp).count();
+    std::time_t tt = system_clock::to_time_t(now);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &tt);
 #else
-    char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d.%03d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                       tm.tm_hour, tm.tm_min, tm.tm_sec, (int)now_ms.count());
-    return std::string(buffer);
+    localtime_r(&tt, &tm);
 #endif
+    char buf[32] = {};
+    std::strftime(buf, sizeof(buf), "%F %T", &tm);
+    return std::format("{}.{:03}", std::string(buf), ms);
 }
 
-void Logger::printLog(LogLevel level, const std::string& logText)
+std::string levelToString(logger::LogLevel level)
 {
-    if (level > m_printLevel) return;
-    std::cout << logText << std::endl;
-#ifdef __ANDROID__
-    switch (m_level) {
-    case NEAPU_LOG_LEVEL_ERROR:
-        __android_log_print(ANDROID_LOG_ERROR, "neapu_log", "%s\n", logText.c_str());
-        break;
-    case NEAPU_LOG_LEVEL_WARNING:
-        __android_log_print(ANDROID_LOG_WARN, "neapu_log", "%s\n", logText.c_str());
-        break;
-    case NEAPU_LOG_LEVEL_INFO:
-        __android_log_print(ANDROID_LOG_INFO, "neapu_log", "%s\n", logText.c_str());
-        break;
-    case NEAPU_LOG_LEVEL_DEBUG:
-        __android_log_print(ANDROID_LOG_DEBUG, "neapu_log", "%s\n", logText.c_str());
-        break;
+    using enum logger::LogLevel;
+    switch (level) {
+    case ERROR: return "ERROR";
+    case WARN: return "WARN";
+    case INFO: return "INFO";
+    case DEBUG: return "DEBUG";
+    default: return std::string{};
     }
-#endif
+}
 }
 
-void Logger::writeLog(LogLevel level, const std::string& logText)
+namespace logger {
+std::ostream& operator<<(std::ostream& os, LogLevel level)
 {
-    if (level > m_logLevel) return;
-    if (m_logPath.empty()) return;
+    os << levelToString(level);
+    return os;
+}
 
-    if (!openFile()) {
-        std::cerr << "Failed to open log file: " << m_logPath << std::endl;
+std::string Logger::s_logPath{};
+std::map<std::string, std::ofstream> Logger::s_ofstreamMap{};
+std::streamoff Logger::s_maxFileSize = 1024 * 1024;
+LogLevel Logger::s_printLevel = LogLevel::DEBUG;
+LogLevel Logger::s_logLevel = LogLevel::NONE;
+std::recursive_mutex Logger::s_mutex{};
+std::atomic<bool> Logger::s_lockEnabled{true};
+Logger::Logger(LogLevel level, const std::string& channel, const std::source_location& location)
+    : m_level(level), m_location(location), m_channel(channel)
+{
+    if (m_channel.empty()) {
+        m_channel = "Default";
+    }
+}
+Logger::~Logger()
+{
+    if (m_data.str().empty() || m_level == LogLevel::NONE) {
+        return;
+    }
+    if (m_level > s_printLevel && (s_logPath.empty() || m_level > s_logLevel)) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(m_fileMutex);
-    if (m_firstLog) {
-        m_firstLog = false;
-        fprintf(m_pFile, "------------------------%s------------------------\n", getTimeString().c_str());
-    }
-    fprintf(m_pFile, "%s\n", logText.c_str());
-    fflush(m_pFile);
+    std::stringstream ss;
+    ss << "[" << getTimeString() << "]";
+    ss << "[" << m_channel << "]";
+    ss << "[" << levelToString(m_level) << "]";
+
+    auto threadId = std::this_thread::get_id();
+
+    ss << "[TID:" << threadId << "]";
+
+    const auto fileName = std::filesystem::path(m_location.file_name()).filename().string();
+    ss << "[" << fileName << ":" << m_location.line() << "]";
+
+    pureLog(m_level, m_channel, ss.str() + m_data.str());
 }
 
-bool Logger::openFile()
+Logger& Logger::operator<<(const char* s)
 {
-    std::time_t now_c = time(nullptr);
-    char temp[64];
-    strftime(temp, 64, "%Y%m%d", localtime(&now_c));
-    char szNewFile[128];
-    snprintf(szNewFile, 128, "%s%s_%s.log", m_logPath.c_str(), m_logPrefix.c_str(), temp);
-    if (m_pFile) {
-        if (m_logFileName == szNewFile) return true;
-        fclose(m_pFile);
+    if (s) {
+        m_data.write(s, static_cast<std::streamsize>(std::char_traits<char>::length(s)));
+    } else {
+        m_data << "(null)";
     }
-    m_logFileName = szNewFile;
-    m_pFile = fopen(szNewFile, "a");
-    if (!m_pFile) return false;
-    return true;
+    return *this;
 }
+
+Logger& Logger::operator<<(std::string_view sv)
+{
+    m_data.write(sv.data(), static_cast<std::streamsize>(sv.size()));
+    return *this;
 }
+
+Logger& Logger::operator<<(const std::string& s)
+{
+    m_data.write(s.data(), static_cast<std::streamsize>(s.size()));
+    return *this;
+}
+#ifdef _WIN32
+Logger& Logger::operator<<(const wchar_t* ws)
+{
+    if (ws) {
+        std::wstring_view wsv(ws);
+        int needed = ::WideCharToMultiByte(CP_UTF8, 0, wsv.data(), static_cast<int>(wsv.size()), nullptr, 0, nullptr, nullptr);
+        if (needed > 0) {
+            std::string out(static_cast<size_t>(needed), '\0');
+            int written = ::WideCharToMultiByte(CP_UTF8, 0, wsv.data(), static_cast<int>(wsv.size()), out.data(), needed, nullptr, nullptr);
+            if (written > 0) {
+                m_data.write(out.data(), static_cast<std::streamsize>(out.size()));
+            }
+        }
+    } else {
+        m_data << "(null)";
+    }
+    return *this;
+}
+Logger& Logger::operator<<(std::wstring_view wsv)
+{
+    int needed = ::WideCharToMultiByte(CP_UTF8, 0, wsv.data(), static_cast<int>(wsv.size()), nullptr, 0, nullptr, nullptr);
+    if (needed > 0) {
+        std::string out(static_cast<size_t>(needed), '\0');
+        int written = ::WideCharToMultiByte(CP_UTF8, 0, wsv.data(), static_cast<int>(wsv.size()), out.data(), needed, nullptr, nullptr);
+        if (written > 0) {
+            m_data.write(out.data(), static_cast<std::streamsize>(out.size()));
+        }
+    }
+    return *this;
+}
+Logger& Logger::operator<<(const std::wstring& ws)
+{
+    std::wstring_view wsv(ws);
+    int needed = ::WideCharToMultiByte(CP_UTF8, 0, wsv.data(), static_cast<int>(wsv.size()), nullptr, 0, nullptr, nullptr);
+    if (needed > 0) {
+        std::string out(static_cast<size_t>(needed), '\0');
+        int written = ::WideCharToMultiByte(CP_UTF8, 0, wsv.data(), static_cast<int>(wsv.size()), out.data(), needed, nullptr, nullptr);
+        if (written > 0) {
+            m_data.write(out.data(), static_cast<std::streamsize>(out.size()));
+        }
+    }
+    return *this;
+}
+#endif
+void Logger::setLogPath(const std::string& path)
+{
+    s_logPath = path;
+    if (s_logPath.ends_with('/') || s_logPath.ends_with('\\')) {
+        s_logPath.pop_back();
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(s_logPath, ec);
+}
+void Logger::openNewFile(const std::string& channel)
+{
+    std::unique_lock<std::recursive_mutex> lock;
+    if (s_lockEnabled.load()) {
+        lock = std::unique_lock<std::recursive_mutex>(s_mutex);
+    }
+    std::ofstream os;
+    os.open(s_logPath + "/" + channel + ".log", std::ios::out | std::ios::app);
+    if (!os.is_open()) {
+        return;
+    }
+    os << "[" << getTimeString() << "][HEADER][PID:" << getProcessId() << "]" << std::endl;
+    s_ofstreamMap.emplace(channel, std::move(os));
+}
+void Logger::setMaxFileSize(std::streamoff bytes)
+{
+    s_maxFileSize = bytes;
+}
+void Logger::rotateIfNeeded(const std::string& channel)
+{
+    std::unique_lock<std::recursive_mutex> lock;
+    if (s_lockEnabled.load()) {
+        lock = std::unique_lock<std::recursive_mutex>(s_mutex);
+    }
+    auto it = s_ofstreamMap.find(channel);
+    if (it == s_ofstreamMap.end()) {
+        return;
+    }
+    if (it->second.tellp() <= s_maxFileSize) {
+        return;
+    }
+    it->second.close();
+    s_ofstreamMap.erase(it);
+    using namespace std::chrono;
+    const auto now = system_clock::now();
+    std::time_t tt = system_clock::to_time_t(now);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &tt);
+#else
+    localtime_r(&tt, &tm);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y%m%d%H%M%S", &tm);
+    const std::string timestamp = buf;
+    const std::string baseName = s_logPath + "/" + channel + ".log";
+    const std::string oldDir = s_logPath + "/old";
+    std::error_code ec;
+    std::filesystem::create_directories(oldDir, ec);
+    const std::string newName = oldDir + "/" + channel + "_" + timestamp + ".log";
+    std::filesystem::rename(baseName, newName, ec);
+    openNewFile(channel);
+}
+void Logger::pureLog(LogLevel level, const std::string& channel, const std::string& message)
+{
+    // print to console
+    if (level <= s_printLevel && s_printLevel != LogLevel::NONE) {
+        std::cout << message << std::endl;
+    }
+
+    // log to file
+    if (s_logPath.empty() || level > s_logLevel || s_logLevel == LogLevel::NONE) {
+        return;
+    }
+
+    std::unique_lock<std::recursive_mutex> lock;
+    if (s_lockEnabled.load()) {
+        lock = std::unique_lock<std::recursive_mutex>(s_mutex);
+    }
+
+    auto it = s_ofstreamMap.find(channel);
+    if (it == s_ofstreamMap.end()) {
+        openNewFile(channel);
+        it = s_ofstreamMap.find(channel);
+        if (it == s_ofstreamMap.end()) {
+            return;
+        }
+    }
+
+    rotateIfNeeded(channel);
+    it = s_ofstreamMap.find(channel);
+    if (it == s_ofstreamMap.end()) {
+        return;
+    }
+
+    it->second << message << std::endl;
+}
+void Logger::setLockingEnabled(bool enabled)
+{
+    s_lockEnabled.store(enabled);
+}
+Logger LogDebug(const std::string& channel, const std::source_location& location)
+{
+    return Logger(LogLevel::DEBUG, channel, location);
+}
+Logger LogInfo(const std::string& channel, const std::source_location& location)
+{
+    return Logger(LogLevel::INFO, channel, location);
+}
+Logger LogWarn(const std::string& channel, const std::source_location& location)
+{
+    return Logger(LogLevel::WARN, channel, location);
+}
+Logger LogError(const std::string& channel, const std::source_location& location)
+{
+    return Logger(LogLevel::ERROR, channel, location);
+}
+FunctionTracer::FunctionTracer(LogLevel level, const std::string& channel, const std::source_location& location)
+    : m_level(level), m_channel(channel), m_location(location)
+{
+    Logger(level, channel, location) << "[ENTER][" << m_location.function_name() << "]";
+}
+FunctionTracer::~FunctionTracer()
+{
+    Logger(m_level, m_channel, m_location) << "[EXIT][" << m_location.function_name() << "]";
+}
+} // namespace logger
