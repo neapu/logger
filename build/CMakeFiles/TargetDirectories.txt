@@ -1,0 +1,3 @@
+/home/runner/work/logger/logger/build/CMakeFiles/logger.dir
+/home/runner/work/logger/logger/build/CMakeFiles/edit_cache.dir
+/home/runner/work/logger/logger/build/CMakeFiles/rebuild_cache.dir
