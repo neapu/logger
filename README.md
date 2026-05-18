@@ -18,6 +18,26 @@ add_subdirectory(logger)
 target_link_libraries(your_target PRIVATE logger)
 ```
 
+### CMake Configuration (FetchContent)
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+    logger
+    GIT_REPOSITORY https://github.com/neapu/logger.git
+    GIT_TAG master
+)
+
+FetchContent_MakeAvailable(logger)
+
+target_link_libraries(your_target PRIVATE logger)
+```
+
+```c++
+#include "logger.h"
+```
+
 ### C++ Code
 
 ```c++
