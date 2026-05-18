@@ -17,6 +17,11 @@ else()
     endif()
 endif()
 add_library(${PROJECT_NAME} STATIC logger.h logger.cpp)
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<INSTALL_INTERFACE:include>
+)
 if (MSVC)
     target_compile_options(${PROJECT_NAME} PUBLIC /Zc:__cplusplus)
 endif()
