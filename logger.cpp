@@ -24,17 +24,16 @@ std::string getTimeString()
 #endif
     char buf[32] = {};
     std::strftime(buf, sizeof(buf), "%F %T", &tm);
-    return std::format("{}.{:03}", std::string(buf), ms);
+    return fmt::format("{}.{:03}", std::string(buf), ms);
 }
 
 std::string levelToString(logger::LogLevel level)
 {
-    using enum logger::LogLevel;
     switch (level) {
-    case ERROR: return "ERROR";
-    case WARN: return "WARN";
-    case INFO: return "INFO";
-    case DEBUG: return "DEBUG";
+    case logger::LogLevel::ERROR: return "ERROR";
+    case logger::LogLevel::WARN: return "WARN";
+    case logger::LogLevel::INFO: return "INFO";
+    case logger::LogLevel::DEBUG: return "DEBUG";
     default: return std::string{};
     }
 }
@@ -54,8 +53,11 @@ LogLevel Logger::s_printLevel = LogLevel::DEBUG;
 LogLevel Logger::s_logLevel = LogLevel::NONE;
 std::recursive_mutex Logger::s_mutex{};
 std::atomic<bool> Logger::s_lockEnabled{true};
-Logger::Logger(LogLevel level, const std::string& channel, const std::source_location& location)
-    : m_level(level), m_location(location), m_channel(channel)
+Logger::Logger(
+    LogLevel level, const std::string& channel, const std::string& file, 
+    const std::string& function, int line
+)
+    : m_level(level), m_file(file), m_function(function), m_line(line), m_channel(channel)
 {
     if (m_channel.empty()) {
         m_channel = "Default";
@@ -79,8 +81,8 @@ Logger::~Logger()
 
     ss << "[TID:" << threadId << "]";
 
-    const auto fileName = std::filesystem::path(m_location.file_name()).filename().string();
-    ss << "[" << fileName << ":" << m_location.line() << "]";
+    const auto fileName = std::filesystem::path(m_file).filename().string();
+    ss << "[" << fileName << ":" << m_line << "]";
 
     pureLog(m_level, m_channel, ss.str() + m_data.str());
 }
@@ -153,7 +155,7 @@ Logger& Logger::operator<<(const std::wstring& ws)
 void Logger::setLogPath(const std::string& path)
 {
     s_logPath = path;
-    if (s_logPath.ends_with('/') || s_logPath.ends_with('\\')) {
+    if (!s_logPath.empty() && (s_logPath.back() == '/' || s_logPath.back() == '\\')) {
         s_logPath.pop_back();
     }
     std::error_code ec;
@@ -250,29 +252,29 @@ void Logger::setLockingEnabled(bool enabled)
 {
     s_lockEnabled.store(enabled);
 }
-Logger LogDebug(const std::string& channel, const std::source_location& location)
+Logger LogDebug(const std::string& channel, const std::string& file, const std::string& function, int line)
 {
-    return Logger(LogLevel::DEBUG, channel, location);
+    return Logger(LogLevel::DEBUG, channel, file, function, line);
 }
-Logger LogInfo(const std::string& channel, const std::source_location& location)
+Logger LogInfo(const std::string& channel, const std::string& file, const std::string& function, int line)
 {
-    return Logger(LogLevel::INFO, channel, location);
+    return Logger(LogLevel::INFO, channel, file, function, line);
 }
-Logger LogWarn(const std::string& channel, const std::source_location& location)
+Logger LogWarn(const std::string& channel, const std::string& file, const std::string& function, int line)
 {
-    return Logger(LogLevel::WARN, channel, location);
+    return Logger(LogLevel::WARN, channel, file, function, line);
 }
-Logger LogError(const std::string& channel, const std::source_location& location)
+Logger LogError(const std::string& channel, const std::string& file, const std::string& function, int line)
 {
-    return Logger(LogLevel::ERROR, channel, location);
+    return Logger(LogLevel::ERROR, channel, file, function, line);
 }
-FunctionTracer::FunctionTracer(LogLevel level, const std::string& channel, const std::source_location& location)
-    : m_level(level), m_channel(channel), m_location(location)
+FunctionTracer::FunctionTracer(LogLevel level, const std::string& channel, const std::string& file, const std::string& function, int line)
+    : m_level(level), m_channel(channel), m_file(file), m_function(function), m_line(line)
 {
-    Logger(level, channel, location) << "[ENTER][" << m_location.function_name() << "]";
+    Logger(level, channel, file, function, line) << "[ENTER][" << function << "]";
 }
 FunctionTracer::~FunctionTracer()
 {
-    Logger(m_level, m_channel, m_location) << "[EXIT][" << m_location.function_name() << "]";
+    Logger(m_level, m_channel, m_file, m_function, m_line) << "[EXIT][" << m_function << "]";
 }
 } // namespace logger

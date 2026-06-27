@@ -4,8 +4,6 @@
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <format>
-#include <source_location>
 #include <chrono>
 #include <map>
 #include <fstream>
@@ -14,13 +12,14 @@
 #include <atomic>
 #include <ctime>
 #ifdef _WIN32
-
 #include <stringapiset.h>
 #include <process.h>
 #else
 #include <unistd.h>
 #endif
 #include <thread>
+
+#include <fmt/format.h>
 
 namespace logger {
 enum class LogLevel {
@@ -34,7 +33,7 @@ std::ostream& operator<<(std::ostream& os, LogLevel level);
 
 class Logger {
 public:
-    Logger(LogLevel level, const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+    Logger(LogLevel level, const std::string& channel = std::string{}, const std::string& file = __FILE__, const std::string& function = __FUNCTION__, int line = __LINE__);
     ~Logger();
 
     Logger& operator<<(const char* s);
@@ -44,7 +43,7 @@ public:
     Logger& operator<<(const wchar_t* ws);
     Logger& operator<<(std::wstring_view wsv);
     Logger& operator<<(const std::wstring& ws);
-#endif
+
     template <class T>
         requires (!std::is_same_v<std::remove_cvref_t<T>, std::wstring>
                && !std::is_same_v<std::remove_cvref_t<T>, std::wstring_view>
@@ -55,19 +54,20 @@ public:
         m_data << std::forward<T>(t);
         return *this;
     }
+#endif
 
     template<typename... Args>
-    Logger& format(std::format_string<Args...> fmt, Args&&... args)
+    Logger& format(fmt::format_string<Args...> fmt, Args&&... args)
     {
-        auto formatted = std::format(fmt, std::forward<Args>(args)...);
+        auto formatted = fmt::format(fmt, std::forward<Args>(args)...);
         m_data << std::string_view(formatted);
         return *this;
     }
 #ifdef _WIN32
     template<typename... Args>
-    Logger& format_w(std::wformat_string<Args...> fmt, Args&&... args)
+    Logger& format_w(fmt::wformat_string<Args...> fmt, Args&&... args)
     {
-        auto formatted = std::format(fmt, std::forward<Args>(args)...);
+        auto formatted = fmt::format(fmt, std::forward<Args>(args)...);
         const wchar_t* data = formatted.c_str();
         int len = static_cast<int>(formatted.size());
         int needed = ::WideCharToMultiByte(CP_UTF8, 0, data, len, nullptr, 0, nullptr, nullptr);
@@ -93,7 +93,9 @@ public:
 private:
     std::stringstream m_data;
     LogLevel m_level;
-    std::source_location m_location;
+    std::string m_file;
+    std::string m_function;
+    int m_line;
     std::string m_channel;
     static std::string s_logPath;
     static std::map<std::string, std::ofstream> s_ofstreamMap;
@@ -103,19 +105,21 @@ private:
     static std::recursive_mutex s_mutex;
     static std::atomic<bool> s_lockEnabled;
 };
-Logger LogDebug(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
-Logger LogInfo(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
-Logger LogWarn(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
-Logger LogError(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+Logger LogDebug(const std::string& channel = std::string{}, const std::string& file = __FILE__, const std::string& function = __FUNCTION__, int line = __LINE__);
+Logger LogInfo(const std::string& channel = std::string{}, const std::string& file = __FILE__, const std::string& function = __FUNCTION__, int line = __LINE__);
+Logger LogWarn(const std::string& channel = std::string{}, const std::string& file = __FILE__, const std::string& function = __FUNCTION__, int line = __LINE__);
+Logger LogError(const std::string& channel = std::string{}, const std::string& file = __FILE__, const std::string& function = __FUNCTION__, int line = __LINE__);
 
 class FunctionTracer {
 public:
-    explicit FunctionTracer(LogLevel level = LogLevel::INFO, const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
+    explicit FunctionTracer(LogLevel level = LogLevel::INFO, const std::string& channel = std::string{}, const std::string& file = __FILE__, const std::string& function = __FUNCTION__, int line = __LINE__);
     ~FunctionTracer();
 private:
     LogLevel m_level;
     std::string m_channel;
-    std::source_location m_location;
+    std::string m_file;
+    std::string m_function;
+    int m_line;
     std::string m_logPrefix;
 };
 }
