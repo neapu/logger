@@ -27,6 +27,24 @@ std::string getTimeString()
     return std::format("{}.{:03}", std::string(buf), ms);
 }
 
+std::string getTimeOnlyString()
+{
+    using namespace std::chrono;
+    const auto now = system_clock::now();
+    const auto sec_tp = floor<seconds>(now);
+    const auto ms = duration_cast<milliseconds>(now - sec_tp).count();
+    std::time_t tt = system_clock::to_time_t(now);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &tt);
+#else
+    localtime_r(&tt, &tm);
+#endif
+    char buf[32] = {};
+    std::strftime(buf, sizeof(buf), "%T", &tm);
+    return std::format("{}.{:03}", std::string(buf), ms);
+}
+
 std::string levelToString(logger::LogLevel level)
 {
     using enum logger::LogLevel;
@@ -54,6 +72,7 @@ LogLevel Logger::s_printLevel = LogLevel::DEBUG;
 LogLevel Logger::s_logLevel = LogLevel::NONE;
 std::recursive_mutex Logger::s_mutex{};
 std::atomic<bool> Logger::s_lockEnabled{true};
+bool Logger::s_consoleConciseEnabled{false};
 Logger::Logger(LogLevel level, const std::string& channel, const std::source_location& location)
     : m_level(level), m_location(location), m_channel(channel)
 {
@@ -70,19 +89,25 @@ Logger::~Logger()
         return;
     }
 
-    std::stringstream ss;
-    ss << "[" << getTimeString() << "]";
-    ss << "[" << m_channel << "]";
-    ss << "[" << levelToString(m_level) << "]";
-
     auto threadId = std::this_thread::get_id();
-
-    ss << "[TID:" << threadId << "]";
-
     const auto fileName = std::filesystem::path(m_location.file_name()).filename().string();
-    ss << "[" << fileName << ":" << m_location.line() << "]";
 
-    pureLog(m_level, m_channel, ss.str() + m_data.str());
+    std::stringstream fileSs;
+    fileSs << "[" << getTimeString() << "]";
+    fileSs << "[" << m_channel << "]";
+    fileSs << "[" << levelToString(m_level) << "]";
+    fileSs << "[TID:" << threadId << "]";
+    fileSs << "[" << fileName << ":" << m_location.line() << "]";
+    const std::string fileMsg = fileSs.str() + m_data.str();
+
+    std::string consoleMsg;
+    if (s_consoleConciseEnabled) {
+        consoleMsg = "[" + getTimeOnlyString() + "]" + m_data.str();
+    } else {
+        consoleMsg = fileMsg;
+    }
+
+    output(m_level, m_channel, consoleMsg, fileMsg);
 }
 
 Logger& Logger::operator<<(const char* s)
@@ -214,9 +239,13 @@ void Logger::rotateIfNeeded(const std::string& channel)
 }
 void Logger::pureLog(LogLevel level, const std::string& channel, const std::string& message)
 {
+    output(level, channel, message, message);
+}
+void Logger::output(LogLevel level, const std::string& channel, const std::string& consoleMsg, const std::string& fileMsg)
+{
     // print to console
     if (level <= s_printLevel && s_printLevel != LogLevel::NONE) {
-        std::cout << message << std::endl;
+        std::cout << consoleMsg << std::endl;
     }
 
     // log to file
@@ -244,11 +273,15 @@ void Logger::pureLog(LogLevel level, const std::string& channel, const std::stri
         return;
     }
 
-    it->second << message << std::endl;
+    it->second << fileMsg << std::endl;
 }
 void Logger::setLockingEnabled(bool enabled)
 {
     s_lockEnabled.store(enabled);
+}
+void Logger::setConsoleConciseEnabled(bool enabled)
+{
+    s_consoleConciseEnabled = enabled;
 }
 Logger LogDebug(const std::string& channel, const std::source_location& location)
 {

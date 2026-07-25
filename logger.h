@@ -90,7 +90,10 @@ public:
     static void setLogLevel(LogLevel level) { s_logLevel = level; }
     static void pureLog(LogLevel level, const std::string& channel, const std::string& message);
     static void setLockingEnabled(bool enabled);
+    static void setConsoleConciseEnabled(bool enabled);
 private:
+    static void output(LogLevel level, const std::string& channel, const std::string& consoleMsg, const std::string& fileMsg);
+
     std::stringstream m_data;
     LogLevel m_level;
     std::source_location m_location;
@@ -102,6 +105,7 @@ private:
     static LogLevel s_logLevel;
     static std::recursive_mutex s_mutex;
     static std::atomic<bool> s_lockEnabled;
+    static bool s_consoleConciseEnabled;
 };
 Logger LogDebug(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
 Logger LogInfo(const std::string& channel = std::string{}, const std::source_location& location = std::source_location::current());
